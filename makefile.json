@@ -3,6 +3,7 @@
   "projects": [
 	{
 	  "name": "test",
+	  "outputPath": "bin/",
 	  "sources": [
 		"Test/Source/*.cpp"
 	  ],

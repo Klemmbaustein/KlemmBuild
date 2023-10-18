@@ -97,16 +97,28 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	for (const auto& i : Build->Libraries)
 	{
 		AllObjs.append(" " + i + ".lib");
+		if (std::filesystem::exists(i + ".dll") && !std::filesystem::is_directory(i + ".dll"))
+		{
+			std::filesystem::copy(i + ".dll", Build->OutputPath + FileUtility::GetFilenameFromPath(i) + ".dll");
+		}
 	}
 
 	BuildScript << "echo BUILD: LINK" << std::endl;
+
+	std::string OutputPath = "./";
+	if (!Build->OutputPath.empty())
+	{
+		OutputPath = Build->OutputPath;
+		std::filesystem::create_directories(OutputPath);
+	}
+
 	switch (Build->TargetType)
 	{
 	case BuildInfo::BuildType::Executable:
-		BuildScript << LinkExeLocation << AllObjs << " /nologo /std:c++20 /OUT:" << Build->TargetName << ".exe || goto :error" << std::endl;
+		BuildScript << LinkExeLocation << AllObjs << " /nologo /std:c++20 /OUT:" << OutputPath << Build->TargetName << ".exe || goto :error" << std::endl;
 		break;
 	case BuildInfo::BuildType::DynamicLibrary:
-		BuildScript << LinkExeLocation << " /nologo /DLL /OUT:" << Build->TargetName << ".dll" << AllObjs << " || goto :error" << std::endl;
+		BuildScript << LinkExeLocation << " /nologo /DLL /OUT:" << OutputPath << Build->TargetName << ".dll" << AllObjs << " || goto :error" << std::endl;
 		break;
 
 	default:

@@ -21,6 +21,7 @@ public:
 
 	bool IsMakefile = false;
 	std::string MakefilePath;
+	std::string OutputPath;
 
 	std::vector<std::string> CompiledFiles;
 	std::vector<std::string> IncludePaths;

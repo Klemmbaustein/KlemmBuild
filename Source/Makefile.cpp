@@ -81,6 +81,10 @@ Makefile Makefile::ReadMakefile(std::string File)
 					NewProject->IncludePaths.push_back(inc);
 				}
 			}
+			if (i.contains("outputPath"))
+			{
+				NewProject->OutputPath = i.at("outputPath");;
+			}
 			if (i.contains("libs"))
 			{
 				for (const auto& lib : i.at("libs"))
