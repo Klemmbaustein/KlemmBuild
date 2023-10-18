@@ -1,4 +1,6 @@
+#include <lib.hpp>
+
 const char* GetMessage()
 {
-	return "Hello, World. With 2 linked files!";
+	return GetHi();
 }

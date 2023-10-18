@@ -9,6 +9,7 @@ class VCBuild : public BuildSystem
 {
 public:
 	VCBuild();
+	~VCBuild();
 
 	virtual std::string Compile(std::string Source, BuildInfo* Build) override;
 	virtual std::string Link(std::vector<std::string> Sources, BuildInfo* Build) override;

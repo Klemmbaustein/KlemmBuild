@@ -1,11 +1,41 @@
 #include "BuildSystem/VCBuild.h"
 #include "Makefile.h"
+#include <iostream>
+#include <filesystem>
+#include "FileUtility.h"
 
-std::string BuildProject(BuildInfo* Build)
+std::string BuildMakefile(std::string Makefile);
+
+std::string BuildProject(BuildInfo* Build, Makefile& Make, BuildSystem* System = nullptr)
 {
-	BuildSystem* System = nullptr;
+	bool OwnsSystem = false;
+	if (System == nullptr)
+	{
+		System = new VCBuild();
+		OwnsSystem = true;
+	}
 
-	System = new VCBuild();
+	for (const auto& dep : Build->Dependencies)
+	{
+		for (BuildInfo* p : Make.Projects)
+		{
+			if (p->TargetName == dep)
+			{
+				std::cout << "Building dependency for project '" << Build->TargetName << "': '" << p->TargetName << "'" << std::endl;
+				BuildProject(p, Make, System);
+			}
+		}
+	}
+
+	if (Build->IsMakefile)
+	{
+		BuildMakefile(Build->MakefilePath);
+		if (OwnsSystem)
+		{
+			delete System;
+		}
+		return "";
+	}
 
 	std::vector<std::string> ObjectFiles;
 
@@ -15,15 +45,44 @@ std::string BuildProject(BuildInfo* Build)
 	}
 
 	std::string OutFile = System->Link(ObjectFiles, Build);
-	delete System;
+	if (OwnsSystem)
+	{
+		delete System;
+	}
 	return OutFile;
+}
+
+std::string BuildMakefile(std::string Makefile)
+{
+	std::cout << "Building makefile " << Makefile << std::endl;
+	auto MakefilePath = std::filesystem::absolute(Makefile);
+	auto PrevPath = std::filesystem::absolute(std::filesystem::current_path());
+	std::filesystem::current_path(FileUtility::RemoveFilename(Makefile));
+
+	if (!std::filesystem::exists(MakefilePath))
+	{
+		throw 2;
+		return "";
+	}
+
+	auto LoadedMakefile = Makefile::ReadMakefile(MakefilePath.string());
+	if (LoadedMakefile.DefaultProject == SIZE_MAX)
+	{
+		for (BuildInfo* i : LoadedMakefile.Projects)
+		{
+			BuildProject(i, LoadedMakefile);
+		}
+	}
+	else
+	{
+		BuildProject(LoadedMakefile.Projects[LoadedMakefile.DefaultProject], LoadedMakefile);
+	}
+
+	std::filesystem::current_path(PrevPath);
+	return "";
 }
 
 int main()
 {
-	auto Makefiles = Makefile::ReadMakefile("makefile.json");
-	for (BuildInfo* i : Makefiles)
-	{
-		BuildProject(i);
-	}
+	BuildMakefile("makefile.json");
 }

@@ -5,7 +5,7 @@
 struct BuildInfo
 {
 public:
-	enum class OptimisationLevel
+	enum class OptimizationType
 	{
 		None,
 		Fastest,
@@ -19,10 +19,16 @@ public:
 		StaticLibrary
 	};
 
+	bool IsMakefile = false;
+	std::string MakefilePath;
+
 	std::vector<std::string> CompiledFiles;
 	std::vector<std::string> IncludePaths;
+	std::vector<std::string> Libraries;
+	std::vector<std::string> Dependencies;
 
 
+	OptimizationType TargetOpt = OptimizationType::None;
 	BuildType TargetType = BuildType::Executable;
 	std::string TargetName;
 };

@@ -38,6 +38,12 @@ VCBuild::VCBuild()
 	BuildScript << "call " << VCVarsLocation << " x64" << std::endl;
 }
 
+VCBuild::~VCBuild()
+{
+	BuildScript.close();
+	std::filesystem::remove("build.cmd");
+}
+
 std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 {
 	BuildScript << "echo BUILD: COMPILE " << Source << std::endl;
@@ -48,17 +54,51 @@ std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 		Includes.append(" /I\"" + i + "\" ");
 	}
 
+	std::string OptString;
+	switch (Build->TargetOpt)
+	{
+	case BuildInfo::OptimizationType::None:
+		OptString = "/Od";
+		break;
 
-	BuildScript << ClLocation + " /nologo /showIncludes /c /std:c++20 /EHsc " + Source + Includes + " /Fo:\"Build/" + Source + ".obj\"" << " || goto :error" << std::endl;
+	case BuildInfo::OptimizationType::Fastest:
+		OptString = "/O2";
+		break;
+
+	case BuildInfo::OptimizationType::Smallest:
+		OptString = "/O1";
+		break;
+
+	default:
+		break;
+	}
+
+	std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Source));
+	BuildScript << ClLocation
+		+ " /nologo /showIncludes /c /std:c++20 /EHsc "
+		+ OptString
+		+ " "
+		+ Source
+		+ Includes 
+		+ " /Fo:\"Build/"
+		+ Source
+		+ ".obj\"" << " || goto :error" << std::endl;
 	return "Build/" + Source + ".obj";
 }
 std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 {
+	std::cout << "Building project '" << Build->TargetName << "' with build system MSVC" << std::endl;
+
 	std::string AllObjs;
 	for (const auto& i : Sources)
 	{
 		AllObjs.append(" " + i);
 	}
+	for (const auto& i : Build->Libraries)
+	{
+		AllObjs.append(" " + i + ".lib");
+	}
+
 	BuildScript << "echo BUILD: LINK" << std::endl;
 	switch (Build->TargetType)
 	{
@@ -66,7 +106,7 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		BuildScript << LinkExeLocation << AllObjs << " /nologo /std:c++20 /OUT:" << Build->TargetName << ".exe || goto :error" << std::endl;
 		break;
 	case BuildInfo::BuildType::DynamicLibrary:
-		BuildScript << LinkExeLocation << " /nologo /DLL /OUT:" << Build->TargetName << ".dll" << AllObjs <<" || goto :error" << std::endl;
+		BuildScript << LinkExeLocation << " /nologo /DLL /OUT:" << Build->TargetName << ".dll" << AllObjs << " || goto :error" << std::endl;
 		break;
 
 	default:
@@ -122,7 +162,7 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 				CurrentCompiledFile.Path = CurrentLine.substr(15);
 				CurrentCompiledFile.ObjPath = "Build/" + CurrentLine.substr(15) + ".obj";
 				CurrentCompiledFile.ObjDeps.clear();
-				std::cout << "Compiling " + CurrentLine.substr(15) << std::endl;
+				std::cout << "- Compiling " + CurrentLine.substr(15) << std::endl;
 			}
 			else if (CurrentLine.find("error") != std::string::npos)
 			{
@@ -134,7 +174,7 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 			}
 			else if (CurrentLine == "BUILD: LINK")
 			{
-				std::cout << "Linking..." << std::endl;
+				std::cout << "- Linking..." << std::endl;
 			}
 			CurrentLine.clear();
 			continue;
@@ -168,16 +208,28 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		return "";
 	}
 
-	std::cout << "Project " << Build->TargetName << " -> " << Build->TargetName << ".exe" << std::endl;
-
 	std::filesystem::remove("build.cmd");
+	BuildScript = std::ofstream("build.cmd");
+	BuildScript << "call " << VCVarsLocation << " x64" << std::endl;
 
-	return Build->TargetName + ".exe";
+	switch (Build->TargetType)
+	{
+	case BuildInfo::BuildType::Executable:
+		std::cout << "Project '" << Build->TargetName << "' -> " << Build->TargetName << ".exe" << std::endl;
+		return Build->TargetName + ".exe";
+		break;
+	case BuildInfo::BuildType::DynamicLibrary:
+		std::cout << "Project '" << Build->TargetName << "' -> " << Build->TargetName << ".dll" << std::endl;
+		return Build->TargetName + ".lib";
+	default:
+		break;
+	}
+	return "";
 }
 std::string VCBuild::PreprocessFile(std::string Source, std::vector<std::string> Definitions)
 {
 	std::cout << "Reading ";
-	FILE* Preprocessor = _popen((ClLocation + "/c /EP /nologo " + Source + " && echo $END").c_str(), "r");
+	FILE* Preprocessor = _popen((ClLocation + "/c /EP /nologo /D MSVC_WINDOWS /D CONFIG=Release " + Source + " && echo $END").c_str(), "r");
 
 	std::string File;
 	while (true)

@@ -4,7 +4,9 @@
 #include <iostream>
 using namespace nlohmann;
 
-std::vector<BuildInfo*> Makefile::ReadMakefile(std::string File)
+#define CONFIG Release
+
+Makefile Makefile::ReadMakefile(std::string File)
 {
 #if WITH_VCBUILD
 	VCBuild Build;
@@ -19,6 +21,15 @@ std::vector<BuildInfo*> Makefile::ReadMakefile(std::string File)
 		{
 			BuildInfo* NewProject = new BuildInfo();
 			NewProject->TargetName = i.at("name");
+
+			if (i.contains("makefile"))
+			{
+				NewProject->IsMakefile = true;
+				NewProject->MakefilePath = i.at("makefile");
+				Projects.push_back(NewProject);
+				continue;
+			}
+
 			for (const auto& f : i.at("sources"))
 			{
 				std::string FileString = f;
@@ -70,6 +81,14 @@ std::vector<BuildInfo*> Makefile::ReadMakefile(std::string File)
 					NewProject->IncludePaths.push_back(inc);
 				}
 			}
+			if (i.contains("libs"))
+			{
+				for (const auto& lib : i.at("libs"))
+				{
+					NewProject->Libraries.push_back(lib);
+				}
+			}
+
 			if (i.contains("type"))
 			{
 				if (i.at("type") == "executable")
@@ -86,9 +105,46 @@ std::vector<BuildInfo*> Makefile::ReadMakefile(std::string File)
 				}
 			}
 
+			if (i.contains("optimization"))
+			{
+				if (i.at("optimization") == "none")
+				{
+					NewProject->TargetOpt = BuildInfo::OptimizationType::None;
+				}
+				else if (i.at("optimization") == "fast")
+				{
+					NewProject->TargetOpt = BuildInfo::OptimizationType::Fastest;
+				}
+				else if (i.at("optimization") == "small")
+				{
+					NewProject->TargetOpt = BuildInfo::OptimizationType::Smallest;
+				}
+			}
+
+			if (i.contains("dependencies"))
+			{
+				for (const auto& dep : i.at("dependencies"))
+				{
+					NewProject->Dependencies.push_back(dep);
+				}
+			}
+
 			Projects.push_back(NewProject);
 		}
-		return Projects;
+
+		Makefile m;
+		m.Projects = Projects;
+		if (MakefileJson.contains("defaultProject"))
+		{
+			for (size_t i = 0; i < m.Projects.size(); i++)
+			{
+				if (Projects[i]->TargetName == MakefileJson.at("defaultProject").get<std::string>())
+				{
+					m.DefaultProject = i;
+				}
+			}
+		}
+		return m;
 	}
 	catch (json::exception& e)
 	{

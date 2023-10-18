@@ -1,7 +1,9 @@
 #pragma once
 #include "Build.h"
 
-namespace Makefile
+struct Makefile
 {
-	std::vector<BuildInfo*> ReadMakefile(std::string File);
-}
+	std::vector<BuildInfo*> Projects;
+	size_t DefaultProject = SIZE_MAX;
+	static Makefile ReadMakefile(std::string File);
+};

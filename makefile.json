@@ -1,17 +1,24 @@
 {
-	"projects": [
-		{
-			"name": "test",
-			"sources": [
-				"Test/Source/*.cpp"
-			]
-		},
-		{
-			"name": "dynlib",
-			"type": "dynamic_lib",
-			"sources": [
-				"Test/LibSource/*.cpp"
-			]
-		}
-	]
+  "defaultProject": "test",
+  "projects": [
+	{
+	  "name": "test",
+	  "sources": [
+		"Test/Source/*.cpp"
+	  ],
+	  "includes": [
+		"Test/LibHeaders"
+	  ],
+	  "libs": [
+		"Test/lib"
+	  ],
+	  "dependencies": [
+		"lib"
+	  ]
+	},
+	{
+	  "name": "lib",
+	  "makefile": "Test/lib.json"
+	}
+  ]
 }

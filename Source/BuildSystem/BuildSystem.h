@@ -4,6 +4,7 @@
 class BuildSystem
 {
 public:
+	virtual ~BuildSystem() {}
 	/*
 	* Compiles the file 'Source' with the BuildInfo 'Build'. Returns a path to the new object file.
 	*/

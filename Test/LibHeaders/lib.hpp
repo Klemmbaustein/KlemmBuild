@@ -1,0 +1,1 @@
+_declspec(dllimport) const char* GetHi();

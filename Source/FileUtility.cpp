@@ -10,7 +10,7 @@ std::string FileUtility::RemoveFilename(const std::string& Path)
 	size_t Index = Path.find_last_of("/\\");
 	if (Index == std::string::npos)
 	{
-		return "";
+		return "./";
 	}
 	return Path.substr(0, Index);
 }
