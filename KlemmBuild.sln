@@ -8,8 +8,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{5AF78864-C409-4D2F-8A33-7ECB88E35B54}"
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
-		Test\Source\test.cpp = Test\Source\test.cpp
 		makefile.json = makefile.json
+		Test\Source\test.cpp = Test\Source\test.cpp
+		Test\Source\test2.cpp = Test\Source\test2.cpp
 	EndProjectSection
 EndProject
 Global

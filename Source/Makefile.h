@@ -1,6 +1,7 @@
 #pragma once
 #include "Build.h"
 
+
 struct Makefile
 {
 	std::vector<BuildInfo*> Projects;

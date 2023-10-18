@@ -9,7 +9,7 @@ using namespace nlohmann;
 Makefile Makefile::ReadMakefile(std::string File)
 {
 #if WITH_VCBUILD
-	VCBuild Build;
+	VCBuild Build = VCBuild(false);
 #endif
 	try
 	{

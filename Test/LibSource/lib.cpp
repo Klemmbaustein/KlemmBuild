@@ -1,5 +1,5 @@
 
 _declspec(dllexport) const char* GetHi()
 {
-	return "hi";
+	return "hi hello";
 }

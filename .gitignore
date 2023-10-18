@@ -367,3 +367,4 @@ Build/
 *.dll
 *.lib
 *.exp
+*.kdep

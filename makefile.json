@@ -1,9 +1,10 @@
 {
-  "defaultProject": "test",
+  "defaultProject": "Test",
   "projects": [
 	{
-	  "name": "test",
+	  "name": "Test",
 	  "outputPath": "bin/",
+	  "optimization": "small",
 	  "sources": [
 		"Test/Source/*.cpp"
 	  ],
@@ -11,15 +12,17 @@
 		"Test/LibHeaders"
 	  ],
 	  "libs": [
-		"Test/lib"
+		"bin/lib/lib"
 	  ],
-	  "dependencies": [
-		"lib"
-	  ]
+	  "dependencies": [ "lib" ]
 	},
 	{
 	  "name": "lib",
-	  "makefile": "Test/lib.json"
+	  "type": "dynamic_lib",
+	  "outputPath": "bin/lib",
+	  "sources": [
+		"Test/LibSource/*.cpp"
+	  ]
 	}
   ]
 }
