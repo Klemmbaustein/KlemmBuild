@@ -1,7 +1,7 @@
 #pragma once
 #include "Build.h"
 
-std::vector<BuildInfo*> ReadMakefile(std::string File)
+namespace Makefile
 {
-
+	std::vector<BuildInfo*> ReadMakefile(std::string File);
 }

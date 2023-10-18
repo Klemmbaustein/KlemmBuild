@@ -7,7 +7,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "KlemmBuild", "Source\KlemmB
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{5AF78864-C409-4D2F-8A33-7ECB88E35B54}"
 	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
 		Test\Source\test.cpp = Test\Source\test.cpp
+		makefile.json = makefile.json
 	EndProjectSection
 EndProject
 Global

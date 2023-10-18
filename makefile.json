@@ -1,0 +1,17 @@
+{
+	"projects": [
+		{
+			"name": "test",
+			"sources": [
+				"Test/Source/*.cpp"
+			]
+		},
+		{
+			"name": "dynlib",
+			"type": "dynamic_lib",
+			"sources": [
+				"Test/LibSource/*.cpp"
+			]
+		}
+	]
+}

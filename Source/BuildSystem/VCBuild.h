@@ -3,6 +3,8 @@
 #include "BuildSystem.h"
 #include <fstream>
 
+#define WITH_VCBUILD 1
+
 class VCBuild : public BuildSystem
 {
 public:

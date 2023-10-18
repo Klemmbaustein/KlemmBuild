@@ -41,7 +41,15 @@ VCBuild::VCBuild()
 std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 {
 	BuildScript << "echo BUILD: COMPILE " << Source << std::endl;
-	BuildScript << ClLocation + " /nologo /showIncludes /c /EHsc " + Source + " /Fo:\"Build/" + Source + ".obj\"" << " || goto :error" << std::endl;
+
+	std::string Includes = "";
+	for (const auto& i : Build->IncludePaths)
+	{
+		Includes.append(" /I\"" + i + "\" ");
+	}
+
+
+	BuildScript << ClLocation + " /nologo /showIncludes /c /std:c++20 /EHsc " + Source + Includes + " /Fo:\"Build/" + Source + ".obj\"" << " || goto :error" << std::endl;
 	return "Build/" + Source + ".obj";
 }
 std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
@@ -52,12 +60,24 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		AllObjs.append(" " + i);
 	}
 	BuildScript << "echo BUILD: LINK" << std::endl;
-	BuildScript << LinkExeLocation << AllObjs << " /nologo /OUT:" << Build->TargetName << ".exe" << std::endl;
+	switch (Build->TargetType)
+	{
+	case BuildInfo::BuildType::Executable:
+		BuildScript << LinkExeLocation << AllObjs << " /nologo /std:c++20 /OUT:" << Build->TargetName << ".exe || goto :error" << std::endl;
+		break;
+	case BuildInfo::BuildType::DynamicLibrary:
+		BuildScript << LinkExeLocation << " /nologo /DLL /OUT:" << Build->TargetName << ".dll" << AllObjs <<" || goto :error" << std::endl;
+		break;
+
+	default:
+		break;
+	}
 	BuildScript << "echo BUILD: DONE" << std::endl;
 	BuildScript << "exit" << std::endl;
 	BuildScript << ":error" << std::endl;
 	BuildScript << "echo BUILD: COMPILED WITH ERROS" << std::endl;
 	BuildScript << "echo BUILD: DONE" << std::endl;
+	BuildScript << "exit 1" << std::endl;
 	BuildScript.close();
 	FILE* BuildProcess = _popen("cmd.exe /c build.cmd", "r");
 
@@ -73,7 +93,6 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 
 	std::vector<CompileTimeFile> Files;
 	CompileTimeFile CurrentCompiledFile;
-	std::cout << "Registering msvc env vars" << std::endl;
 
 	std::ofstream OutLog = std::ofstream("Build/kbuild.log");
 	OutLog << "KlemmBuild version " << KlemmBuild::Version << std::endl;
@@ -140,7 +159,7 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 
 	if (Return)
 	{
-		std::cout << "Build failed with errors: " << std::endl;
+		std::cout << "Build failed: " << std::endl;
 		for (auto& i : ErrorStrings)
 		{
 			std::cout << i << std::endl;
@@ -149,7 +168,7 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		return "";
 	}
 
-	std::cout << Build->TargetName << ".kbld -> " << Build->TargetName << ".exe" << std::endl;
+	std::cout << "Project " << Build->TargetName << " -> " << Build->TargetName << ".exe" << std::endl;
 
 	std::filesystem::remove("build.cmd");
 
@@ -157,7 +176,31 @@ std::string VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 }
 std::string VCBuild::PreprocessFile(std::string Source, std::vector<std::string> Definitions)
 {
-	_popen((ClLocation + "/c /EP /nologo " + Source).c_str(), "r");
-	return std::string();
+	std::cout << "Reading ";
+	FILE* Preprocessor = _popen((ClLocation + "/c /EP /nologo " + Source + " && echo $END").c_str(), "r");
+
+	std::string File;
+	while (true)
+	{
+		char NewChar;
+		fread(&NewChar, sizeof(char), 1, Preprocessor);
+		File.append({NewChar});
+		if (File.size() >= 4 && File.substr(File.size() - 4) == "$END")
+		{
+			File = File.substr(0, File.size() - 4);
+			break;
+		}
+	}
+
+
+	int ret = _pclose(Preprocessor);
+	
+	if (ret)
+	{
+		std::cout << "Preprocessing failed: " + Source << std::endl;
+		return "";
+	}
+
+	return File;
 }
 #endif
