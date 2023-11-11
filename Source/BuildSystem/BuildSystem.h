@@ -14,5 +14,7 @@ public:
 
 	virtual std::string PreprocessFile(std::string Source, std::vector<std::string> Definitions) = 0;
 
-	virtual bool RequiresRebuild(std::string File) = 0;
+	virtual bool RequiresRebuild(std::string File, BuildInfo* Info) = 0;
+
+	virtual int ShellExecute(std::string cmd) { return system(cmd.c_str()); };
 };

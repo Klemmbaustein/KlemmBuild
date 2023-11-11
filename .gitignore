@@ -368,3 +368,5 @@ Build/
 *.lib
 *.exp
 *.kdep
+/KlemmBuild
+/Linux_Build/Source

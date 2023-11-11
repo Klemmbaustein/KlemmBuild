@@ -30,6 +30,9 @@
     <ClCompile Include="Makefile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BuildSystem\GCC-Linux.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Build.h">
@@ -51,6 +54,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Makefile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BuildSystem\GCC-Linux.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

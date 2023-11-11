@@ -1,9 +1,0 @@
-{
-  "projects": [
-	{
-	  "name": "lib",
-	  "sources": "LibSource/*.cpp",
-	  "type": "dynamic_lib"
-	}
-  ]
-}

@@ -7,7 +7,6 @@
 #include "../KlemmBuild.h"
 #include <thread>
 
-#define BUILD_NUM_THREADS 4
 std::vector<int> VCBuild::BuildOutput;
 
 struct CompileTimeFile
@@ -17,9 +16,9 @@ struct CompileTimeFile
 	std::vector<std::string> ObjDeps;
 };
 
-bool VCBuild::RequiresRebuild(std::string File)
+bool VCBuild::RequiresRebuild(std::string File, BuildInfo* Info)
 {
-	std::string ObjectFile = "Build/" + File + ".obj";
+	std::string ObjectFile = "Build/" + Info->TargetName + "/" + File + ".obj";
 	if (!std::filesystem::exists(ObjectFile))
 	{
 		return true;
@@ -29,8 +28,12 @@ bool VCBuild::RequiresRebuild(std::string File)
 	{
 		return true;
 	}
-
-	std::ifstream DepsFile ("Build/" + File + ".obj.kdep");
+	std::string DepsFilePath = "Build/" + Info->TargetName + "/" + File + ".obj.kdep";
+	if (!std::filesystem::exists(DepsFilePath))
+	{
+		return true;
+	}
+	std::ifstream DepsFile = std::ifstream(DepsFilePath);
 	while (!DepsFile.eof())
 	{
 		char Path[4096];
@@ -47,7 +50,26 @@ bool VCBuild::RequiresRebuild(std::string File)
 	return false;
 }
 
-void VCBuild::CompileThread(int Index)
+int VCBuild::ShellExecute(std::string cmd)
+{
+	std::ofstream out = std::ofstream("Build\\cmd\\cmd.cmd");
+	out << "@echo off" << std::endl;
+	out << "set VSCMD_ARG_HOST_ARCH=x64" << std::endl;
+	out << "set VSCMD_ARG_TGT_ARCH=x64" << std::endl;
+	out << "set VSCMD_ARG_APP_PLAT=Desktop" << std::endl;
+	out << "set VSINSTALLDIR=C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\" << std::endl;
+	out << "call \"%VSINSTALLDIR%\\Common7\\Tools\\vsdevcmd\\ext\\vcvars.bat\"" << std::endl;
+	out << "call \"%VSINSTALLDIR%\\Common7\\Tools\\vsdevcmd\\core\\winsdk.bat\"" << std::endl;
+	out << "if not defined INCLUDE set INCLUDE=%__VSCMD_VCVARS_INCLUDE%%__VSCMD_WINSDK_INCLUDE%%__VSCMD_NETFX_INCLUDE%%INCLUDE%" << std::endl;
+	out << cmd;
+	out << "exit /k %errorlevel%";
+	out.close();
+	int ret = system("Build\\cmd\\cmd.cmd");
+	std::filesystem::remove("Build\\cmd\\cmd.cmd");
+	return ret;
+}
+
+void VCBuild::CompileThread(int Index, BuildInfo* Info)
 {
 	FILE* BuildProcess = _popen(("cmd.exe /c Build\\cmd\\build_t" + std::to_string(Index) + ".cmd").c_str(), "r");
 	std::vector<std::string> FileDependencies;
@@ -77,7 +99,7 @@ void VCBuild::CompileThread(int Index)
 					Files.push_back(CurrentCompiledFile);
 				}
 				CurrentCompiledFile.Path = CurrentLine.substr(15);
-				CurrentCompiledFile.ObjPath = "Build/" + CurrentLine.substr(15) + ".obj";
+				CurrentCompiledFile.ObjPath = "Build/" + Info->TargetName + "/" + CurrentLine.substr(15) + ".obj";
 				CurrentCompiledFile.ObjDeps.clear();
 				std::cout << "- Compiling " + CurrentLine.substr(15) << std::endl;
 			}
@@ -147,17 +169,22 @@ std::string VCBuild::GetVSLocation()
 VCBuild::VCBuild(bool UsedForBuild)
 {
 	std::string VSLocation = GetVSLocation();
-	std::string ToolsLocation = VSLocation + "\\VC\\Tools\\MSVC\\14.37.32822\\bin\\Hostx64\\x64\\";
-	VCVarsLocation = "\"" + VSLocation + "\\VC\\Auxiliary\\Build\\vcvarsall.bat\"";
+	std::string ToolsLocation = VSLocation + "\\VC\\Tools\\MSVC\\";
+
+	for (auto& i : std::filesystem::directory_iterator(ToolsLocation))
+	{
+		ToolsLocation.append(i.path().filename().string() + "\\bin\\Hostx64\\x64\\");
+		break;
+	}
+
 	ClLocation = "\"" + ToolsLocation + "cl.exe\"";
-	LinkExeLocation = "\"" + ToolsLocation + "link.exe\"";
 	std::filesystem::create_directories("Build/cmd");
 	if (UsedForBuild)
 	{
-		BuildScripts.resize(BUILD_NUM_THREADS + 1);
-		for (size_t i = 0; i <= BUILD_NUM_THREADS; i++)
+		BuildScripts.resize(KlemmBuild::BuildThreads + 1);
+		for (size_t i = 0; i <= KlemmBuild::BuildThreads; i++)
 		{
-			if (i < BUILD_NUM_THREADS)
+			if (i < KlemmBuild::BuildThreads)
 			{
 				BuildScripts[i] = std::ofstream("Build/cmd/build_t" + std::to_string(i) + ".cmd");
 			}
@@ -169,12 +196,12 @@ VCBuild::VCBuild(bool UsedForBuild)
 			BuildScripts[i] << "set VSCMD_ARG_HOST_ARCH=x64" << std::endl;
 			BuildScripts[i] << "set VSCMD_ARG_TGT_ARCH=x64" << std::endl;
 			BuildScripts[i] << "set VSCMD_ARG_APP_PLAT=Desktop" << std::endl;
-			BuildScripts[i] << "set VSINSTALLDIR=C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\" << std::endl;
+			BuildScripts[i] << "set VSINSTALLDIR=" + VSLocation + "\\" << std::endl;
 			BuildScripts[i] << "call \"%VSINSTALLDIR%\\Common7\\Tools\\vsdevcmd\\ext\\vcvars.bat\"" << std::endl;
 			BuildScripts[i] << "call \"%VSINSTALLDIR%\\Common7\\Tools\\vsdevcmd\\core\\winsdk.bat\"" << std::endl;
 			BuildScripts[i] << "if not defined INCLUDE set INCLUDE=%__VSCMD_VCVARS_INCLUDE%%__VSCMD_WINSDK_INCLUDE%%__VSCMD_NETFX_INCLUDE%%INCLUDE%" << std::endl;
 		}
-		BuildOutput.resize(BUILD_NUM_THREADS);
+		BuildOutput.resize(KlemmBuild::BuildThreads);
 	}
 }
 
@@ -184,8 +211,8 @@ VCBuild::~VCBuild()
 	{
 		return;
 	}
-	BuildScripts[BUILD_NUM_THREADS].close();
-	for (int i = 0; i < BUILD_NUM_THREADS; i++)
+	BuildScripts[KlemmBuild::BuildThreads].close();
+	for (int i = 0; i < KlemmBuild::BuildThreads; i++)
 	{
 		BuildScripts[i].close();
 	}
@@ -193,9 +220,9 @@ VCBuild::~VCBuild()
 
 std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 {
-	if (RequiresRebuild(Source))
+	if (RequiresRebuild(Source, Build))
 	{
-		int CompileThreadIndex = CompileIndex++ % BUILD_NUM_THREADS;
+		int CompileThreadIndex = CompileIndex++ % KlemmBuild::BuildThreads;
 		BuildScripts[CompileThreadIndex] << "echo BUILD: COMPILE " << Source << std::endl;
 
 		std::string Includes = "";
@@ -222,18 +249,27 @@ std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 		default:
 			break;
 		}
-		std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Source));
-		BuildScripts[CompileThreadIndex] << ClLocation
-			+ " /nologo /showIncludes /c /std:c++20 /EHsc "
+
+		std::string PreprocessorString;
+		for (auto& i : Build->PreProcessorDefinitions)
+		{
+			PreprocessorString.append(" /D " + i + " ");
+		}
+
+		std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Build->TargetName + "/" + Source));
+		BuildScripts[CompileThreadIndex] << "cl /nologo /showIncludes /MD /c /permissive- /Zc:preprocessor /std:c++20 /EHsc "
 			+ OptString
 			+ " "
+			+ PreprocessorString
 			+ Source
 			+ Includes
 			+ " /Fo:\"Build/"
+			+ Build->TargetName 
+			+ "/"
 			+ Source
 			+ ".obj\"" << " || goto :error" << std::endl;
 	}
-	return "Build/" + Source + ".obj";
+	return "Build/" + Build->TargetName + "/" + Source + ".obj";
 }
 bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 {
@@ -250,12 +286,12 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		if (std::filesystem::exists(i + ".dll") && !std::filesystem::is_directory(i + ".dll"))
 		{
 			std::filesystem::copy(i + ".dll",
-				Build->OutputPath + FileUtility::GetFilenameFromPath(i) + ".dll",
+				Build->OutputPath + "/" + FileUtility::GetFilenameFromPath(i) + ".dll",
 				std::filesystem::copy_options::overwrite_existing);
 		}
 	}
 
-	for (int i = 0; i < BUILD_NUM_THREADS; i++)
+	for (int i = 0; i < KlemmBuild::BuildThreads; i++)
 	{
 		BuildScripts[i] << "echo BUILD: DONE" << std::endl;
 		BuildScripts[i] << "exit" << std::endl;
@@ -266,13 +302,13 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	}
 
 	std::vector<std::thread*> BuildThreads;
-	for (int i = 0; i < BUILD_NUM_THREADS; i++)
+	for (int i = 0; i < KlemmBuild::BuildThreads; i++)
 	{
-		BuildThreads.push_back(new std::thread(CompileThread, i));
+		BuildThreads.push_back(new std::thread(CompileThread, i, Build));
 	}
 
 	bool Failed = false;
-	for (int i = 0; i < BUILD_NUM_THREADS; i++)
+	for (int i = 0; i < KlemmBuild::BuildThreads; i++)
 	{
 		BuildThreads[i]->join();
 		delete BuildThreads[i];
@@ -287,7 +323,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		return false;
 	}
 
-	BuildScripts[BUILD_NUM_THREADS] << "echo BUILD: LINK" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: LINK" << std::endl;
 
 	std::string OutputPath = "./";
 	if (!Build->OutputPath.empty())
@@ -305,18 +341,18 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	switch (Build->TargetType)
 	{
 	case BuildInfo::BuildType::Executable:
-		BuildScripts[BUILD_NUM_THREADS] 
-			<< LinkExeLocation
-			<< AllObjs << " /nologo /OUT:"
+		BuildScripts[KlemmBuild::BuildThreads]
+			<< "link"
+			<< AllObjs << " /nologo /MD /OUT:"
 			<< OutputPath
 			<< Build->TargetName
 			<< ".exe || goto :error" << std::endl;
 		OutputFile.append(".exe");
 		break;
 	case BuildInfo::BuildType::DynamicLibrary:
-		BuildScripts[BUILD_NUM_THREADS] 
-			<< LinkExeLocation
-			<< " /nologo /DLL /OUT:"
+		BuildScripts[KlemmBuild::BuildThreads]
+			<< "link"
+			<< " /nologo /DLL /MD /OUT:"
 			<< OutputPath
 			<< Build->TargetName
 			<< ".dll"
@@ -324,7 +360,17 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 			<< " || goto :error" << std::endl;
 		OutputFile.append(".dll");
 		break;
-
+	case BuildInfo::BuildType::StaticLibrary:
+		BuildScripts[KlemmBuild::BuildThreads]
+			<< "lib"
+			<< " /nologo /OUT:"
+			<< OutputPath
+			<< Build->TargetName
+			<< ".lib"
+			<< AllObjs
+			<< " || goto :error" << std::endl;
+		OutputFile.append(".lib");
+		break;
 	default:
 		break;
 	}
@@ -346,6 +392,10 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		}
 		for (const auto& i : Build->Libraries)
 		{
+			if (!std::filesystem::exists(i + ".lib"))
+			{
+				continue;
+			}
 			if (std::filesystem::last_write_time(i + ".lib") > std::filesystem::last_write_time(OutputFile))
 			{
 				Relink = true;
@@ -357,13 +407,13 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		Relink = true;
 	}
 
-	BuildScripts[BUILD_NUM_THREADS] << "echo BUILD: DONE" << std::endl;
-	BuildScripts[BUILD_NUM_THREADS] << "exit" << std::endl;
-	BuildScripts[BUILD_NUM_THREADS] << ":error" << std::endl;
-	BuildScripts[BUILD_NUM_THREADS] << "echo BUILD: COMPILED WITH ERROS" << std::endl;
-	BuildScripts[BUILD_NUM_THREADS] << "echo BUILD: DONE" << std::endl;
-	BuildScripts[BUILD_NUM_THREADS] << "exit 1" << std::endl;
-	BuildScripts[BUILD_NUM_THREADS].close();
+	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: DONE" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads] << "exit" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads] << ":error" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: COMPILED WITH ERROS" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: DONE" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads] << "exit 1" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads].close();
 
 	if (!Relink)
 	{
@@ -400,7 +450,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 					Files.push_back(CurrentCompiledFile);
 				}
 				CurrentCompiledFile.Path = CurrentLine.substr(15);
-				CurrentCompiledFile.ObjPath = "Build/" + CurrentLine.substr(15) + ".obj";
+				CurrentCompiledFile.ObjPath = "Build/" + Build->TargetName + "/" + CurrentLine.substr(15) + ".obj";
 				CurrentCompiledFile.ObjDeps.clear();
 				std::cout << "- Compiling " + CurrentLine.substr(15) << std::endl;
 			}
@@ -441,8 +491,14 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 }
 std::string VCBuild::PreprocessFile(std::string Source, std::vector<std::string> Definitions)
 {
+	std::string DefinitionString;
+	for (auto& i : Definitions)
+	{
+		DefinitionString.append(" /D " + i + " ");
+	}
 	std::cout << "Reading ";
-	FILE* Preprocessor = _popen((ClLocation + "/c /EP /nologo /D MSVC_WINDOWS /D CONFIG=Release " + Source + " && echo $END").c_str(), "r");
+
+	FILE* Preprocessor = _popen((ClLocation + " /c /EP /nologo /D MSVC_WINDOWS " + DefinitionString + Source + " && echo $END || echo $END").c_str(), "r");
 
 	std::string File;
 	while (true)

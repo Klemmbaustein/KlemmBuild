@@ -1,5 +1,14 @@
+#ifdef EXPORT_SHARED
+#ifdef _WIN32
+#define LIB _declspec(dllexport)
+#else
+#define LIB
+#endif
+#else
+#define LIB
+#endif
 
-_declspec(dllexport) const char* GetHi()
+LIB const char* GetHi()
 {
 	return "hi hello";
 }

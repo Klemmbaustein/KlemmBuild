@@ -1,28 +1,15 @@
 {
-  "defaultProject": "Test",
   "projects": [
 	{
-	  "name": "Test",
-	  "outputPath": "bin/",
-	  "optimization": "small",
+	  "name": "klemmBld",
+	  "outputPath": "bin",
 	  "sources": [
-		"Test/Source/*.cpp"
+		"Source/*.cpp"
 	  ],
 	  "includes": [
-		"Test/LibHeaders"
+		"json/include"
 	  ],
-	  "libs": [
-		"bin/lib/lib"
-	  ],
-	  "dependencies": [ "lib" ]
-	},
-	{
-	  "name": "lib",
-	  "type": "dynamic_lib",
-	  "outputPath": "bin/lib",
-	  "sources": [
-		"Test/LibSource/*.cpp"
-	  ]
+	  "optimization": "fast"
 	}
   ]
 }

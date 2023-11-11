@@ -2,5 +2,7 @@
 
 namespace KlemmBuild
 {
-	const char* Version = "0.0.1";
+	constexpr const char* Version = "0.0.1";
+
+	extern uint8_t BuildThreads;
 }

@@ -136,6 +136,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BuildSystem\GCC-Linux.cpp" />
     <ClCompile Include="BuildSystem\VCBuild.cpp" />
     <ClCompile Include="Command.cpp" />
     <ClCompile Include="FileUtility.cpp" />
@@ -145,6 +146,7 @@
   <ItemGroup>
     <ClInclude Include="Build.h" />
     <ClInclude Include="BuildSystem\BuildSystem.h" />
+    <ClInclude Include="BuildSystem\GCC-Linux.h" />
     <ClInclude Include="BuildSystem\VCBuild.h" />
     <ClInclude Include="Command.h" />
     <ClInclude Include="FileUtility.h" />

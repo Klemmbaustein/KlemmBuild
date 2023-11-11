@@ -1,19 +1,19 @@
 #include "Makefile.h"
 #include <nlohmann/json.hpp>
 #include "BuildSystem/VCBuild.h"
+#include "BuildSystem/GCC-Linux.h"
 #include <iostream>
 using namespace nlohmann;
-
-#define CONFIG Release
-
-Makefile Makefile::ReadMakefile(std::string File)
+Makefile Makefile::ReadMakefile(std::string File, std::vector<std::string> Defines)
 {
-#if WITH_VCBUILD
+#if _WIN32
 	VCBuild Build = VCBuild(false);
+#else
+	GCC_Linux Build = GCC_Linux();
 #endif
 	try
 	{
-		json MakefileJson = json::parse(Build.PreprocessFile(File, {}));
+		json MakefileJson = json::parse(Build.PreprocessFile(File, Defines));
 
 		std::vector<BuildInfo*> Projects;
 
@@ -21,6 +21,27 @@ Makefile Makefile::ReadMakefile(std::string File)
 		{
 			BuildInfo* NewProject = new BuildInfo();
 			NewProject->TargetName = i.at("name");
+
+
+			if (i.contains("preBuildCommand"))
+			{
+				NewProject->PreBuildCommand = i.at("preBuildCommand");
+			}
+
+			if (i.contains("dependencies"))
+			{
+				for (const auto& dep : i.at("dependencies"))
+				{
+					NewProject->Dependencies.push_back(dep);
+				}
+			}
+
+			if (i.contains("command"))
+			{
+				NewProject->BuildCommand = i.at("command");
+				Projects.push_back(NewProject);
+				continue;
+			}
 
 			if (i.contains("makefile"))
 			{
@@ -47,7 +68,8 @@ Makefile Makefile::ReadMakefile(std::string File)
 						{
 							TargetExtension = TargetExtension.substr(1);
 						}
-						for (const auto& entry : std::filesystem::recursive_directory_iterator(FileString.substr(0, LastAsterisk)))
+						for (const auto& entry 
+							: std::filesystem::recursive_directory_iterator(FileString.substr(0, LastAsterisk)))
 						{
 							std::string EntryString = entry.path().string();
 							if (entry.is_directory())
@@ -92,7 +114,13 @@ Makefile Makefile::ReadMakefile(std::string File)
 					NewProject->Libraries.push_back(lib);
 				}
 			}
-
+			if (i.contains("defines"))
+			{
+				for (const auto& def : i.at("defines"))
+				{
+					NewProject->PreProcessorDefinitions.push_back(def);
+				}
+			}
 			if (i.contains("type"))
 			{
 				if (i.at("type") == "executable")
@@ -125,14 +153,6 @@ Makefile Makefile::ReadMakefile(std::string File)
 				}
 			}
 
-			if (i.contains("dependencies"))
-			{
-				for (const auto& dep : i.at("dependencies"))
-				{
-					NewProject->Dependencies.push_back(dep);
-				}
-			}
-
 			Projects.push_back(NewProject);
 		}
 
@@ -152,7 +172,8 @@ Makefile Makefile::ReadMakefile(std::string File)
 	}
 	catch (json::exception& e)
 	{
-		std::cout << e.what() << std::endl;
+		std::cout << "Error: " << e.what() << std::endl;
+		std::cout << Build.PreprocessFile(File, Defines) << std::endl;
 	}
 	return {};
 }
