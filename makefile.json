@@ -1,7 +1,9 @@
 {
+  "defaultProject": "klemmBld",
   "projects": [
 	{
 	  "name": "klemmBld",
+	  "debug": true,
 	  "outputPath": "bin",
 	  "sources": [
 		"Source/*.cpp"

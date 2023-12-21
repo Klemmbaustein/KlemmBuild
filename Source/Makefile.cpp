@@ -78,6 +78,8 @@ Makefile Makefile::ReadMakefile(std::string File, std::vector<std::string> Defin
 							}
 							size_t DotIndex = EntryString.find_last_of(".");
 
+							std::replace(EntryString.begin(), EntryString.end(), '\\', '/'); // replace all 'x' to 'y'
+
 							if (TargetExtension.empty())
 							{
 								NewProject->CompiledFiles.push_back(EntryString);
@@ -151,6 +153,11 @@ Makefile Makefile::ReadMakefile(std::string File, std::vector<std::string> Defin
 				{
 					NewProject->TargetOpt = BuildInfo::OptimizationType::Smallest;
 				}
+			}
+
+			if (i.contains("debug"))
+			{
+				NewProject->GenerateDebugInfo = i.at("debug");
 			}
 
 			Projects.push_back(NewProject);

@@ -20,6 +20,8 @@ public:
 	};
 
 	bool IsMakefile = false;
+	bool GenerateDebugInfo = false;
+
 	std::string MakefilePath;
 	std::string OutputPath;
 	std::string PreBuildCommand;

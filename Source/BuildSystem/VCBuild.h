@@ -2,6 +2,7 @@
 #pragma once
 #include "BuildSystem.h"
 #include <fstream>
+#include <atomic>
 
 #define WITH_VCBUILD 1
 
@@ -24,5 +25,7 @@ protected:
 	std::string ClLocation;
 	std::vector<std::ofstream> BuildScripts;
 	static std::vector<int> BuildOutput;
+	static std::atomic<size_t> BuiltFiles;
+	static std::atomic<size_t> AllFiles;
 };
 #endif

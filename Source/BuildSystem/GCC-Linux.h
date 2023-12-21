@@ -1,5 +1,6 @@
 #pragma once
 #include "BuildSystem.h"
+#include <thread>
 
 class GCC_Linux : public BuildSystem
 {
@@ -12,4 +13,9 @@ public:
 	void CompileAll(BuildInfo* Build);
 
 	std::vector<std::string> CompileFiles;
+	std::vector<std::thread*> BuildThreads;
+
+	static void BuildThread(std::vector<std::string> Files, BuildInfo* Build);
+	static std::atomic<size_t> BuiltFiles;
+	static std::atomic<size_t> AllFiles;
 };

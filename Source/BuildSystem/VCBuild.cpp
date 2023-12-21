@@ -1,6 +1,5 @@
 #if _WIN32
 #include "VCBuild.h"
-#include "../Command.h"
 #include <filesystem>
 #include <iostream>
 #include "../FileUtility.h"
@@ -8,6 +7,8 @@
 #include <thread>
 
 std::vector<int> VCBuild::BuildOutput;
+std::atomic<size_t> VCBuild::BuiltFiles;
+std::atomic<size_t> VCBuild::AllFiles;
 
 struct CompileTimeFile
 {
@@ -61,7 +62,7 @@ int VCBuild::ShellExecute(std::string cmd)
 	out << "call \"%VSINSTALLDIR%\\Common7\\Tools\\vsdevcmd\\ext\\vcvars.bat\"" << std::endl;
 	out << "call \"%VSINSTALLDIR%\\Common7\\Tools\\vsdevcmd\\core\\winsdk.bat\"" << std::endl;
 	out << "if not defined INCLUDE set INCLUDE=%__VSCMD_VCVARS_INCLUDE%%__VSCMD_WINSDK_INCLUDE%%__VSCMD_NETFX_INCLUDE%%INCLUDE%" << std::endl;
-	out << cmd;
+	out << cmd << std::endl;
 	out << "exit /k %errorlevel%";
 	out.close();
 	int ret = system("Build\\cmd\\cmd.cmd");
@@ -91,6 +92,7 @@ void VCBuild::CompileThread(int Index, BuildInfo* Info)
 			{
 				FileDependencies.push_back(CurrentLine.substr(22));
 				CurrentCompiledFile.ObjDeps.push_back(CurrentLine.substr(22));
+
 			}
 			else if (CurrentLine.substr(0, 15) == "BUILD: COMPILE ")
 			{
@@ -101,7 +103,8 @@ void VCBuild::CompileThread(int Index, BuildInfo* Info)
 				CurrentCompiledFile.Path = CurrentLine.substr(15);
 				CurrentCompiledFile.ObjPath = "Build/" + Info->TargetName + "/" + CurrentLine.substr(15) + ".obj";
 				CurrentCompiledFile.ObjDeps.clear();
-				std::cout << "- Compiling " + CurrentLine.substr(15) << std::endl;
+				std::cout << "- [" << (size_t)(((float)BuiltFiles / (float)AllFiles) * 100.0f) << "%] Compiling " + CurrentLine.substr(15) << std::endl;
+				BuiltFiles++;
 			}
 			else if (CurrentLine.find("error") != std::string::npos)
 			{
@@ -222,6 +225,7 @@ std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 {
 	if (RequiresRebuild(Source, Build))
 	{
+		std::filesystem::create_directories(Build->OutputPath);
 		int CompileThreadIndex = CompileIndex++ % KlemmBuild::BuildThreads;
 		BuildScripts[CompileThreadIndex] << "echo BUILD: COMPILE " << Source << std::endl;
 
@@ -231,19 +235,19 @@ std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 			Includes.append(" /I\"" + i + "\" ");
 		}
 
-		std::string OptString;
+		std::string Args;
 		switch (Build->TargetOpt)
 		{
 		case BuildInfo::OptimizationType::None:
-			OptString = "/Od";
+			Args = "/Od";
 			break;
 
 		case BuildInfo::OptimizationType::Fastest:
-			OptString = "/O2";
+			Args = "/O2";
 			break;
 
 		case BuildInfo::OptimizationType::Smallest:
-			OptString = "/O1";
+			Args = "/O1";
 			break;
 
 		default:
@@ -256,9 +260,14 @@ std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 			PreprocessorString.append(" /D " + i + " ");
 		}
 
+		if (Build->GenerateDebugInfo)
+		{
+			Args.append(" /DEBUG /Zi /Fd:" + Build->OutputPath + "/" + Build->TargetName + ".pdb ");
+		}
+
 		std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Build->TargetName + "/" + Source));
-		BuildScripts[CompileThreadIndex] << "cl /nologo /showIncludes /MD /c /permissive- /Zc:preprocessor /std:c++20 /EHsc "
-			+ OptString
+		BuildScripts[CompileThreadIndex] << "cl /nologo /FS /showIncludes /D KLEMMBUILD /MD /c /permissive- /Zc:preprocessor /std:c++20 /EHsc /Zc:char8_t- "
+			+ Args
 			+ " "
 			+ PreprocessorString
 			+ Source
@@ -268,6 +277,7 @@ std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 			+ "/"
 			+ Source
 			+ ".obj\"" << " || goto :error" << std::endl;
+		AllFiles++;
 	}
 	return "Build/" + Build->TargetName + "/" + Source + ".obj";
 }
@@ -278,11 +288,11 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	std::string AllObjs;
 	for (const auto& i : Sources)
 	{
-		AllObjs.append(" " + i);
+		AllObjs.append(" " + i + " ");
 	}
 	for (const auto& i : Build->Libraries)
 	{
-		AllObjs.append(" " + i + ".lib");
+		AllObjs.append(" " + i + ".lib ");
 		if (std::filesystem::exists(i + ".dll") && !std::filesystem::is_directory(i + ".dll"))
 		{
 			std::filesystem::copy(i + ".dll",
@@ -338,12 +348,39 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 
 	std::string OutputFile = OutputPath + Build->TargetName;
 
+	std::string VCCoreDeps =
+		"\"kernel32.lib\" "
+		"\"user32.lib\" "
+		"\"gdi32.lib\" "
+		"\"winspool.lib\" "
+		"\"comdlg32.lib\" "
+		"\"advapi32.lib\" "
+		"\"shell32.lib\" "
+		"\"ole32.lib\" "
+		"\"oleaut32.lib\" "
+		"\"uuid.lib\" "
+		"\"odbc32.lib\" "
+		"\"odbccp32.lib\" ";
+
+	if (Build->OutputPath.empty())
+	{
+		Build->OutputPath = ".";
+	}
+
+	std::string Args;
+	if (Build->GenerateDebugInfo)
+	{
+		Args.append(" /DEBUG /Zi /FS /Fd:" + Build->OutputPath + "/" + Build->TargetName + ".pdb ");
+	}
+
 	switch (Build->TargetType)
 	{
 	case BuildInfo::BuildType::Executable:
 		BuildScripts[KlemmBuild::BuildThreads]
 			<< "link"
-			<< AllObjs << " /nologo /MD /OUT:"
+			<< AllObjs << VCCoreDeps << " /nologo /SUBSYSTEM:CONSOLE "
+			<< Args
+			<< "/OUT:"
 			<< OutputPath
 			<< Build->TargetName
 			<< ".exe || goto :error" << std::endl;
@@ -352,7 +389,9 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	case BuildInfo::BuildType::DynamicLibrary:
 		BuildScripts[KlemmBuild::BuildThreads]
 			<< "link"
-			<< " /nologo /DLL /MD /OUT:"
+			<< " /nologo /DLL /MD "
+			<< Args
+			<< " /OUT:"
 			<< OutputPath
 			<< Build->TargetName
 			<< ".dll"
@@ -363,6 +402,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	case BuildInfo::BuildType::StaticLibrary:
 		BuildScripts[KlemmBuild::BuildThreads]
 			<< "lib"
+			<< Args
 			<< " /nologo /OUT:"
 			<< OutputPath
 			<< Build->TargetName
@@ -410,7 +450,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: DONE" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << "exit" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << ":error" << std::endl;
-	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: COMPILED WITH ERROS" << std::endl;
+	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: FAILED WITH ERROS" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: DONE" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << "exit 1" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads].close();
@@ -443,18 +483,11 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 				FileDependencies.push_back(CurrentLine.substr(22));
 				CurrentCompiledFile.ObjDeps.push_back(CurrentLine.substr(22));
 			}
-			else if (CurrentLine.substr(0, 15) == "BUILD: COMPILE ")
-			{
-				if (!CurrentCompiledFile.Path.empty())
-				{
-					Files.push_back(CurrentCompiledFile);
-				}
-				CurrentCompiledFile.Path = CurrentLine.substr(15);
-				CurrentCompiledFile.ObjPath = "Build/" + Build->TargetName + "/" + CurrentLine.substr(15) + ".obj";
-				CurrentCompiledFile.ObjDeps.clear();
-				std::cout << "- Compiling " + CurrentLine.substr(15) << std::endl;
-			}
 			else if (CurrentLine.find("error") != std::string::npos)
+			{
+				ErrorStrings.push_back(CurrentLine);
+			}
+			else if (CurrentLine.find("warning") != std::string::npos)
 			{
 				ErrorStrings.push_back(CurrentLine);
 			}
@@ -464,14 +497,14 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 			}
 			else if (CurrentLine == "BUILD: LINK")
 			{
-				std::cout << "- Linking..." << std::endl;
+				std::cout << "- [100%] Linking..." << std::endl;
 			}
 			CurrentLine.clear();
 			continue;
 		}
 		CurrentLine.append({NewChar});
 	}
-	
+
 	int Return = _pclose(BuildProcess);
 
 	if (Return)
@@ -489,6 +522,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 
 	return true;
 }
+
 std::string VCBuild::PreprocessFile(std::string Source, std::vector<std::string> Definitions)
 {
 	std::string DefinitionString;
@@ -496,9 +530,12 @@ std::string VCBuild::PreprocessFile(std::string Source, std::vector<std::string>
 	{
 		DefinitionString.append(" /D " + i + " ");
 	}
-	std::cout << "Reading ";
 
-	FILE* Preprocessor = _popen((ClLocation + " /c /EP /nologo /D MSVC_WINDOWS " + DefinitionString + Source + " && echo $END || echo $END").c_str(), "r");
+	FILE* Preprocessor = _popen((ClLocation 
+		+ " /c /EP /nologo /D MSVC_WINDOWS "
+		+ DefinitionString
+		+ Source
+		+ " && echo $END || echo $END").c_str(), "r");
 
 	std::string File;
 	while (true)

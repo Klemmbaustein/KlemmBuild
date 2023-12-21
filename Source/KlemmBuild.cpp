@@ -42,6 +42,7 @@ bool BuildProject(BuildInfo* Build, Makefile& Make)
 		{
 			std::cout << "Could not find project '" << dep << "' referenced in '" << Build->TargetName << "'" << std::endl;
 			std::cout << "Build failed - exiting" << std::endl;
+
 			exit(1);
 		}
 	}
@@ -91,6 +92,7 @@ std::string BuildMakefile(std::string Makefile)
 			if (!BuildProject(i, LoadedMakefile))
 			{
 				std::cout << "Build failed - exiting" << std::endl;
+
 				exit(1);
 			}
 		}
@@ -105,6 +107,7 @@ std::string BuildMakefile(std::string Makefile)
 		if (!BuildProject(LoadedMakefile.Projects[LoadedMakefile.DefaultProject], LoadedMakefile))
 		{
 			std::cout << "Build failed - exiting" << std::endl;
+
 			exit(1);
 		}
 	}
