@@ -217,11 +217,11 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 
 std::string GCC_Linux::PreprocessFile(std::string Source, std::vector<std::string> Definitions)
 {
-	if (!std::filesystem::exists("Build/"))
+	if (!std::filesystem::exists("Build"))
 	{
 		try
 		{
-			std::filesystem::create_directories("Build/");
+			std::filesystem::create_directories("Build");
 		}
 		catch (std::exception&)
 		{
