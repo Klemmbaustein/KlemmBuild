@@ -234,7 +234,6 @@ std::string GCC_Linux::PreprocessFile(std::string Source, std::vector<std::strin
 		DefString.append(" -D " + i + " ");
 	}
 	std::string Command = "c++ -x c -E " + Source + DefString + " > Build/cpp.i";
-	std::cout << Command << std::endl;
 	int ret = system(Command.c_str());
 
 	if (ret)
