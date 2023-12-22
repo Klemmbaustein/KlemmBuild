@@ -20,6 +20,7 @@ std::atomic<bool> BuildFailed = false;
 
 std::string GCC_Linux::Compile(std::string Source, BuildInfo* Build)
 {
+
 	std::string ObjectFile = "Build/" + Build->TargetName + "/" + Source + ".o";
 	std::string DepsPath = "Build/" + Build->TargetName + "/" + Source + ".d";
 
@@ -59,11 +60,12 @@ std::string GCC_Linux::Compile(std::string Source, BuildInfo* Build)
 			if (!std::filesystem::exists(Path))
 			{
 				CompileFiles.push_back(Source);
-				continue;
+				break;
 			}
 			if (std::filesystem::last_write_time(Path) > std::filesystem::last_write_time(ObjectFile))
 			{
 				CompileFiles.push_back(Source);
+				break;
 			}
 		}
 		DepsFile.close();
@@ -72,6 +74,7 @@ std::string GCC_Linux::Compile(std::string Source, BuildInfo* Build)
 	{
 		CompileFiles.push_back(Source);
 	}
+
 	return "Build/" + Build->TargetName + "/" + Source + ".o";
 }
 
@@ -90,29 +93,6 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	{
 		SourcesString.append(" " + i + " ");
 	}
-
-	std::string LibStrings;
-	for (auto& i : Build->Libraries)
-	{
-		if (i.substr(0, 3) == "lib")
-		{
-			i = ":" + i;
-		}
-
-		LibStrings.append(" -L"
-			+ std::filesystem::absolute(FileUtility::RemoveFilename(i)).string() 
-			+ " -l" + FileUtility::GetFilenameFromPath(i));
-
-		std::string SoName = FileUtility::RemoveFilename(i) + "/lib" + FileUtility::GetFilenameFromPath(i) + ".so";
-
-		if (std::filesystem::exists(SoName) && !std::filesystem::is_directory(SoName))
-		{
-			std::filesystem::copy(SoName,
-				Build->OutputPath + "/lib" + FileUtility::GetFilenameFromPath(i) + ".so",
-				std::filesystem::copy_options::overwrite_existing);
-		}
-	}
-	std::string Command;
 
 	std::string OutputFile = Build->OutputPath;
 	if (!OutputFile.empty())
@@ -134,6 +114,53 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		break;
 	}
 
+	bool RequiresReLink = false;
+
+	std::string LibStrings;
+	std::filesystem::file_time_type ExecWriteTime;
+	if (!std::filesystem::exists(OutputFile))
+	{
+		RequiresReLink = true;
+	}
+	else
+	{
+		ExecWriteTime = std::filesystem::last_write_time(OutputFile);
+	}
+	for (auto& i : Build->Libraries)
+	{
+		if (i.substr(0, 3) == "lib")
+		{
+			i = ":" + i;
+		}
+
+		LibStrings.append(" -L"
+			+ std::filesystem::absolute(FileUtility::RemoveFilename(i)).string() 
+			+ " -l" + FileUtility::GetFilenameFromPath(i));
+
+		std::string SoName = FileUtility::RemoveFilename(i) + "/lib" + FileUtility::GetFilenameFromPath(i) + ".so";
+		std::string ArchiveName = FileUtility::RemoveFilename(i) + "/lib" + FileUtility::GetFilenameFromPath(i) + ".a";
+
+		if (std::filesystem::exists(SoName) && !std::filesystem::is_directory(SoName))
+		{
+			std::filesystem::copy(SoName,
+				Build->OutputPath + "lib" + FileUtility::GetFilenameFromPath(i) + ".so",
+				std::filesystem::copy_options::overwrite_existing);
+			if (std::filesystem::last_write_time(SoName) > ExecWriteTime)
+			{
+				RequiresReLink = true;
+			}
+		}
+
+		if (std::filesystem::exists(ArchiveName) && !std::filesystem::is_directory(ArchiveName))
+		{
+			if (std::filesystem::last_write_time(ArchiveName) > ExecWriteTime)
+			{
+				RequiresReLink = true;
+			}
+		}
+	}
+	std::string Command;
+
 	switch (Build->TargetType)
 	{
 	case BuildInfo::BuildType::DynamicLibrary:
@@ -148,8 +175,7 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	default:
 		break;
 	}
-
-	bool RequiresReLink = false;
+	//std::cout << Command << std::endl;
 	for (auto& Path : Sources)
 	{
 		if (!std::filesystem::exists(OutputFile))
@@ -162,17 +188,20 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 			RequiresReLink = true;
 			continue;
 		}
-		if (std::filesystem::last_write_time(Path) > std::filesystem::last_write_time(OutputFile))
+		if (std::filesystem::last_write_time(Path) > ExecWriteTime)
 		{
 			RequiresReLink = true;
 		}
 	}
 
-	if (RequiresReLink || !CompileFiles.empty())
+	if (Sources.empty())
 	{
-		std::cout << "- [100%] Linking..." << std::endl;
+		RequiresReLink = true;
+	}
+	if (RequiresReLink || (!CompileFiles.empty()))
+	{
+		std::cout << "- [100%] Linking...";
 		int ret = system(Command.c_str());
-
 		if (ret)
 		{
 			std::cout << "Build failed" << std::endl;
@@ -190,7 +219,17 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 
 std::string GCC_Linux::PreprocessFile(std::string Source, std::vector<std::string> Definitions)
 {
-	std::filesystem::create_directories("Build/");
+	if (!std::filesystem::exists("Build/"))
+	{
+		try
+		{
+			std::filesystem::create_directories("Build/");
+		}
+		catch (std::exception&)
+		{
+
+		}
+	}
 	std::string DefString;
 	for (auto& i : Definitions)
 	{
@@ -230,6 +269,7 @@ bool GCC_Linux::RequiresRebuild(std::string File, BuildInfo* Info)
 
 void GCC_Linux::CompileAll(BuildInfo* Build)
 {
+	BuiltFiles = 0;
 	std::vector<std::vector<std::string>> BuildThreadFiles;
 	BuildThreadFiles.resize(KlemmBuild::BuildThreads);
 	BuildThreads.resize(KlemmBuild::BuildThreads);
@@ -266,13 +306,13 @@ void GCC_Linux::BuildThread(std::vector<std::string> Files, BuildInfo* Build)
 	switch (Build->TargetOpt)
 	{
 	case BuildInfo::OptimizationType::None:
-		Flags.append("-O0");
+		Flags.append("-O0 ");
 		break;
 	case BuildInfo::OptimizationType::Smallest:
-		Flags.append("-Os");
+		Flags.append("-Os ");
 		break;
 	case BuildInfo::OptimizationType::Fastest:
-		Flags.append("-O3");
+		Flags.append("-O3 ");
 		break;
 	default:
 		break;
@@ -280,7 +320,7 @@ void GCC_Linux::BuildThread(std::vector<std::string> Files, BuildInfo* Build)
 
 	for (auto& i : Build->PreProcessorDefinitions)
 	{
-		Flags.append(" -D" + i + " ");
+		Flags.append(" -D " + i + " ");
 	}
 
 	for (auto& i : Files)
@@ -289,7 +329,9 @@ void GCC_Linux::BuildThread(std::vector<std::string> Files, BuildInfo* Build)
 		std::string ObjectFile = "Build/" + Build->TargetName + "/" + i + ".o";
 		std::cout << "- [" << (size_t)(((float)BuiltFiles / (float)AllFiles) * 100.0f) << "%] Compiling " + i << std::endl;
 		BuiltFiles++;
-		int ret = system(("c++ -c -MMD -MP " + i + IncludeString + " " + Flags + " -fno-char8_t -fPIC -std=c++2a -o " + ObjectFile).c_str());
+		std::string Command = "c++ -c -MMD -MP " + Flags + i + IncludeString + " -fno-char8_t -fPIC -std=c++2a -o " + ObjectFile;
+		//std::cout << Command << std::endl;
+		int ret = system(Command.c_str());
 		if (BuildFailed)
 		{
 			break;

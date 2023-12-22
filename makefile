@@ -1,6 +1,6 @@
 TARGET_EXEC := KlemmBuild
 
-BUILD_DIR := ./Linux_Build
+BUILD_DIR := ./obj
 SRC_DIRS := ./Source
 
 SRCS := $(shell find $(SRC_DIRS) -name '*.cpp')
