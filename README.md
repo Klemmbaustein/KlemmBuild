@@ -24,7 +24,7 @@ A simple makefile looks like this:
 {
   "projects": {
     "name": "example",
-    "outputPath": "bin/"
+    "outputPath": "bin/",
     "sources": [ "src/*.cpp" ]
   }
 }
@@ -39,9 +39,9 @@ The executable will be placed in the `bin/` directory.
 #if MSVC_WINDOWS
     "name": "example_windows",
 #else
-    "name": "example_linux"
+    "name": "example_linux",
 #endif
-    "outputPath": "bin/"
+    "outputPath": "bin/",
     "sources": [ "src/*.cpp" ]
   }
 }
