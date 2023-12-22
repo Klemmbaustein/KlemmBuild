@@ -1,6 +1,6 @@
 #include <lib.hpp>
 
-const char* GetMessage()
+const char* GetHelloMessage()
 {
-	return GetHi();
+	return GetMessage();
 }

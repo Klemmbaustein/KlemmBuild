@@ -8,7 +8,7 @@
 #define LIB
 #endif
 
-LIB const char* GetHi()
+LIB const char* GetMessage()
 {
-	return "hi hello";
+	return "Hello World!";
 }

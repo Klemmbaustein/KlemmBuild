@@ -1,8 +1,8 @@
 #include <iostream>
 
-const char* GetMessage();
+const char* GetHelloMessage();
 
 int main()
 {
-	std::cout << GetMessage() << std::endl;
+	std::cout << GetHelloMessage() << std::endl;
 }

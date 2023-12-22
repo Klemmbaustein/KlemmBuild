@@ -57,6 +57,16 @@ Makefile Makefile::ReadMakefile(std::string File, std::vector<std::string> Defin
 				size_t LastAsterisk = FileString.find_last_of("*");
 				if (LastAsterisk == std::string::npos)
 				{
+					if (!std::filesystem::exists(FileString))
+					{
+						std::cout << "Error: No such file or files: '" << FileString << "'" << std::endl;
+						return Makefile();
+					}
+					if (std::filesystem::is_directory(FileString))
+					{
+						std::cout << "Error: The specified file '" << FileString << "' is a directory, not a source file" << std::endl;
+						return Makefile();
+					}
 					NewProject->CompiledFiles.push_back(FileString);
 				}
 				else
@@ -129,11 +139,11 @@ Makefile Makefile::ReadMakefile(std::string File, std::vector<std::string> Defin
 				{
 					NewProject->TargetType = BuildInfo::BuildType::Executable;
 				}
-				else if (i.at("type") == "dynamic_lib")
+				else if (i.at("type") == "dynamicLib")
 				{
 					NewProject->TargetType = BuildInfo::BuildType::DynamicLibrary;
 				}
-				else if (i.at("type") == "static_lib")
+				else if (i.at("type") == "staticLib")
 				{
 					NewProject->TargetType = BuildInfo::BuildType::StaticLibrary;
 				}

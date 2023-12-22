@@ -1,0 +1,28 @@
+{
+	"defaultProject": "Test",
+	"projects": [
+		{
+			"dependencies": "TestLib",
+			"name": "Test",
+			"sources": [
+				"Source/*.cpp"
+			],
+			"includes": [
+				"LibHeaders"
+			],
+			"outputPath": "bin/",
+			"libs": [
+				"lib/TestLib"
+			]
+
+		},
+		{
+			"name": "TestLib",
+			"sources": [
+				"LibSource/*.cpp"
+			],
+			"outputPath": "lib/",
+			"type": "dynamicLib"
+		}
+	]
+}

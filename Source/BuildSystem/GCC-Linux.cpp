@@ -83,7 +83,10 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	if (!Build->OutputPath.empty())
 	{
 		std::filesystem::create_directories(Build->OutputPath);
-		Build->OutputPath.append("/");
+		if (Build->OutputPath[Build->OutputPath.size() - 1] != '/')
+		{
+			Build->OutputPath.append("/");
+		}
 	}
 
 	CompileAll(Build);
@@ -95,10 +98,6 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	}
 
 	std::string OutputFile = Build->OutputPath;
-	if (!OutputFile.empty())
-	{
-		OutputFile.append("/");
-	}
 	switch (Build->TargetType)
 	{
 	case BuildInfo::BuildType::DynamicLibrary:
@@ -128,7 +127,7 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	}
 	for (auto& i : Build->Libraries)
 	{
-		if (i.substr(0, 3) == "lib")
+		if (FileUtility::GetFilenameFromPath(i).substr(0, 3) == "lib")
 		{
 			i = ":" + i;
 		}
@@ -175,7 +174,6 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	default:
 		break;
 	}
-	//std::cout << Command << std::endl;
 	for (auto& Path : Sources)
 	{
 		if (!std::filesystem::exists(OutputFile))
@@ -200,7 +198,7 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	}
 	if (RequiresReLink || (!CompileFiles.empty()))
 	{
-		std::cout << "- [100%] Linking...";
+		std::cout << "- [100%] Linking..." << std::endl;
 		int ret = system(Command.c_str());
 		if (ret)
 		{
