@@ -119,9 +119,36 @@ std::string BuildMakefile(std::string Makefile)
 
 int main(int argc, char** argv)
 {
+	std::vector<std::string> Makefiles;
 	for (int i = 1; i < argc; i++)
 	{
-		GlobalDefines.push_back(argv[i]);
+		std::string ArgStr = argv[i];
+		if (ArgStr.substr(0, 2) == "-D")
+		{
+			GlobalDefines.push_back(ArgStr.substr(2));
+		}
+		else if (std::filesystem::exists(ArgStr))
+		{
+			Makefiles.push_back(ArgStr);
+		}
+		else
+		{
+			std::cout << "Unknown argument: " << ArgStr << std::endl;
+		}
 	}
-	BuildMakefile("makefile.json");
+	if (Makefiles.empty())
+	{
+		if (std::filesystem::exists("makefile.kbld"))
+		{
+			Makefiles = { "makefile.kbld" };
+		}
+		else
+		{
+			std::cout << "No makefile found" << std::endl;
+		}
+	}
+	for (auto& i : Makefiles)
+	{
+		BuildMakefile(i);
+	}
 }

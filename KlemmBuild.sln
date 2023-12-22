@@ -9,8 +9,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{5AF78864-C
 	ProjectSection(SolutionItems) = preProject
 		.gitignore = .gitignore
 		makefile = makefile
-		makefile.json = makefile.json
 		Test\Source\test.cpp = Test\Source\test.cpp
+		makefile.kbld = makefile.kbld
 		Test\Source\test2.cpp = Test\Source\test2.cpp
 	EndProjectSection
 EndProject

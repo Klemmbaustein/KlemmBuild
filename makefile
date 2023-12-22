@@ -24,6 +24,12 @@ $(BUILD_DIR)/%.cpp.o: %.cpp
 clean:
 	rm -r $(BUILD_DIR)
 
+install: $(TARGET_EXEC)
+	$(info Installing to $(PREFIX))
+	install -d $(DESTDIR)$(PREFIX)/bin/
+	install -m 644 ./KlemmBuild $(DESTDIR)$(PREFIX)/bin/
+	chmod +x $(DESTDIR)$(PREFIX)/bin/KlemmBuild
+
 # Include the .d makefiles. The - at the front suppresses the errors of missing
 # Makefiles. Initially, all the .d files will be missing, and we don't want those
 # errors to show up.
