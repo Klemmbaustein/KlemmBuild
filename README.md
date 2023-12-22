@@ -1,4 +1,4 @@
-# KlemmBuild C++ build system.
+# KlemmBuild C++ build system
 
 A C++ build system for Windows MSVC and Linux Clang/GCC.
 
