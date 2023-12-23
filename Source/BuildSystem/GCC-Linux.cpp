@@ -196,7 +196,14 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	{
 		RequiresReLink = true;
 	}
-	if (!BuildFailed && (RequiresReLink || (!CompileFiles.empty())))
+
+	if (BuildFailed)
+	{
+		std::cout << "Build failed" << std::endl;
+		return false;
+	}
+
+	if (RequiresReLink || (!CompileFiles.empty()))
 	{
 		std::cout << "- [100%] Linking..." << std::endl;
 		int ret = system(Command.c_str());
