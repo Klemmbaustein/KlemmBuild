@@ -196,7 +196,7 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	{
 		RequiresReLink = true;
 	}
-	if (RequiresReLink || (!CompileFiles.empty()))
+	if (!BuildFailed && (RequiresReLink || (!CompileFiles.empty())))
 	{
 		std::cout << "- [100%] Linking..." << std::endl;
 		int ret = system(Command.c_str());
@@ -320,6 +320,11 @@ void GCC_Linux::BuildThread(std::vector<std::string> Files, BuildInfo* Build)
 		break;
 	default:
 		break;
+	}
+
+	if (Build->GenerateDebugInfo)
+	{
+		Flags.append(" -g ");
 	}
 
 	for (auto& i : Build->PreProcessorDefinitions)

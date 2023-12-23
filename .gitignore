@@ -368,6 +368,6 @@ Build/
 *.lib
 *.exp
 *.kdep
-./KlemmBuild
 ./Test/lib
 *.so
+KlemmBuild
