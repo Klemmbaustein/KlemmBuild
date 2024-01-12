@@ -1,8 +1,8 @@
 {
-	"defaultProject": "Test",
-	"projects": [
+	"defaultTarget": "Test",
+	"targets": [
 		{
-			"dependencies": "TestLib",
+			"dependencies": ["TestLib", "print"],
 			"name": "Test",
 			"sources": [
 				"Source/*.cpp"
@@ -22,7 +22,12 @@
 				"LibSource/*.cpp"
 			],
 			"outputPath": "lib/",
-			"type": "dynamicLib"
+			"configuration": "sharedLibrary"
+		},
+		{
+		    "type": "command",
+			"name": "print",
+			"command": "echo hello"
 		}
 	]
 }

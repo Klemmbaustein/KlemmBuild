@@ -30,11 +30,20 @@
     <ClCompile Include="BuildSystem\GCC-Linux.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Targets\BuildTarget.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Targets\Target.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Targets\MakefileTarget.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Targets\CommandTarget.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Build.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="BuildSystem\VCBuild.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -51,6 +60,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="BuildSystem\GCC-Linux.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Targets\Target.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Targets\BuildTarget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Targets\MakefileTarget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Targets\CommandTarget.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

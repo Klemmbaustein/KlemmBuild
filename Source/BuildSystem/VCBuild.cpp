@@ -17,9 +17,9 @@ struct CompileTimeFile
 	std::vector<std::string> ObjDeps;
 };
 
-bool VCBuild::RequiresRebuild(std::string File, BuildInfo* Info)
+bool VCBuild::RequiresRebuild(std::string File, Target* Info)
 {
-	std::string ObjectFile = "Build/" + Info->TargetName + "/" + File + ".obj";
+	std::string ObjectFile = "Build/" + Info->Name + "/" + File + ".obj";
 	if (!std::filesystem::exists(ObjectFile))
 	{
 		return true;
@@ -29,7 +29,7 @@ bool VCBuild::RequiresRebuild(std::string File, BuildInfo* Info)
 	{
 		return true;
 	}
-	std::string DepsFilePath = "Build/" + Info->TargetName + "/" + File + ".obj.kdep";
+	std::string DepsFilePath = "Build/" + Info->Name + "/" + File + ".obj.kdep";
 	if (!std::filesystem::exists(DepsFilePath))
 	{
 		return true;
@@ -70,7 +70,7 @@ int VCBuild::ShellExecute(std::string cmd)
 	return ret;
 }
 
-void VCBuild::CompileThread(int Index, BuildInfo* Info)
+void VCBuild::CompileThread(int Index, Target* Info)
 {
 	FILE* BuildProcess = _popen(("cmd.exe /c Build\\cmd\\build_t" + std::to_string(Index) + ".cmd").c_str(), "r");
 	std::vector<std::string> FileDependencies;
@@ -101,7 +101,7 @@ void VCBuild::CompileThread(int Index, BuildInfo* Info)
 					Files.push_back(CurrentCompiledFile);
 				}
 				CurrentCompiledFile.Path = CurrentLine.substr(15);
-				CurrentCompiledFile.ObjPath = "Build/" + Info->TargetName + "/" + CurrentLine.substr(15) + ".obj";
+				CurrentCompiledFile.ObjPath = "Build/" + Info->Name + "/" + CurrentLine.substr(15) + ".obj";
 				CurrentCompiledFile.ObjDeps.clear();
 				std::cout << "- [" << (size_t)(((float)BuiltFiles / (float)AllFiles) * 100.0f) << "%] Compiling " + CurrentLine.substr(15) << std::endl;
 				BuiltFiles++;
@@ -221,51 +221,42 @@ VCBuild::~VCBuild()
 	}
 }
 
-std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
+std::string VCBuild::Compile(std::string Source, Target* Build)
 {
 	if (RequiresRebuild(Source, Build))
 	{
-		std::filesystem::create_directories(Build->OutputPath);
+		std::filesystem::create_directories(Build->GetParameter("outputPath")->Value);
 		int CompileThreadIndex = CompileIndex++ % KlemmBuild::BuildThreads;
 		BuildScripts[CompileThreadIndex] << "echo BUILD: COMPILE " << Source << std::endl;
 
 		std::string Includes = "";
-		for (const auto& i : Build->IncludePaths)
+		for (const auto& i : Build->GetParameter("includes")->GetValues())
 		{
 			Includes.append(" /I\"" + i + "\" ");
 		}
 
 		std::string Args;
-		switch (Build->TargetOpt)
-		{
-		case BuildInfo::OptimizationType::None:
-			Args = "/Od";
-			break;
+		std::string Optimization = Build->GetParameter("optimization")->Value;
 
-		case BuildInfo::OptimizationType::Fastest:
-			Args = "/O2";
-			break;
-
-		case BuildInfo::OptimizationType::Smallest:
-			Args = "/O1";
-			break;
-
-		default:
-			break;
-		}
+		if (Optimization == "none")
+			Args.append("/Od");
+		else if (Optimization == "smallest")
+			Args.append("/O2");
+		else if (Optimization == "fastest")
+			Args.append("/O1");
 
 		std::string PreprocessorString;
-		for (auto& i : Build->PreProcessorDefinitions)
+		for (auto& i : Build->GetParameter("defines")->GetValues())
 		{
 			PreprocessorString.append(" /D " + i + " ");
 		}
 
-		if (Build->GenerateDebugInfo)
+		if (Build->GetParameter("debug")->Value == "1")
 		{
-			Args.append(" /DEBUG /Zi /Fd:" + Build->OutputPath + "/" + Build->TargetName + ".pdb ");
+			Args.append(" /DEBUG /Zi /Fd:" + Build->GetParameter("outputPath")->Value + "/" + Build->Name + ".pdb ");
 		}
 
-		std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Build->TargetName + "/" + Source));
+		std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Build->Name + "/" + Source));
 		BuildScripts[CompileThreadIndex] << "cl /nologo /FS /showIncludes /D KLEMMBUILD /MD /c /permissive- /Zc:preprocessor /std:c++20 /EHsc /Zc:char8_t- "
 			+ Args
 			+ " "
@@ -273,30 +264,32 @@ std::string VCBuild::Compile(std::string Source, BuildInfo* Build)
 			+ Source
 			+ Includes
 			+ " /Fo:\"Build/"
-			+ Build->TargetName 
+			+ Build->Name 
 			+ "/"
 			+ Source
 			+ ".obj\"" << " || goto :error" << std::endl;
 		AllFiles++;
 	}
-	return "Build/" + Build->TargetName + "/" + Source + ".obj";
+	return "Build/" + Build->Name + "/" + Source + ".obj";
 }
-bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
+bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 {
-	std::cout << "Building project '" << Build->TargetName << "' with build system MSVC" << std::endl;
+	std::cout << "Building project '" << Build->Name << "' with build system MSVC" << std::endl;
 
 	std::string AllObjs;
 	for (const auto& i : Sources)
 	{
 		AllObjs.append(" " + i + " ");
 	}
-	for (const auto& i : Build->Libraries)
+	std::string OutPath = Build->GetParameter("outputPath")->Value;
+
+	for (const auto& i : Build->GetParameter("libraries")->GetValues())
 	{
 		AllObjs.append(" " + i + ".lib ");
 		if (std::filesystem::exists(i + ".dll") && !std::filesystem::is_directory(i + ".dll"))
 		{
 			std::filesystem::copy(i + ".dll",
-				Build->OutputPath + "/" + FileUtility::GetFilenameFromPath(i) + ".dll",
+				OutPath + "/" + FileUtility::GetFilenameFromPath(i) + ".dll",
 				std::filesystem::copy_options::overwrite_existing);
 		}
 	}
@@ -336,9 +329,9 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: LINK" << std::endl;
 
 	std::string OutputPath = "./";
-	if (!Build->OutputPath.empty())
+	if (!OutPath.empty())
 	{
-		OutputPath = Build->OutputPath;
+		OutputPath = OutPath;
 		if (OutputPath[OutputPath.size() - 1] != '/')
 		{
 			OutputPath.append("/");
@@ -346,7 +339,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		std::filesystem::create_directories(OutputPath);
 	}
 
-	std::string OutputFile = OutputPath + Build->TargetName;
+	std::string OutputFile = OutputPath + Build->Name;
 
 	std::string VCCoreDeps =
 		"\"kernel32.lib\" "
@@ -362,57 +355,57 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		"\"odbc32.lib\" "
 		"\"odbccp32.lib\" ";
 
-	if (Build->OutputPath.empty())
+	if (OutPath.empty())
 	{
-		Build->OutputPath = ".";
+		OutPath = ".";
 	}
 
 	std::string Args;
-	if (Build->GenerateDebugInfo)
+	if (Build->GetParameter("debug")->Value == "1")
 	{
-		Args.append(" /DEBUG /Zi /FS /Fd:" + Build->OutputPath + "/" + Build->TargetName + ".pdb ");
+		Args.append(" /DEBUG /Zi /FS /Fd:" + OutPath + "/" + Build->Name + ".pdb ");
 	}
 
-	switch (Build->TargetType)
+	std::string Config = Build->GetParameter("configuration")->Name;
+
+	if (Config == "executable")
 	{
-	case BuildInfo::BuildType::Executable:
 		BuildScripts[KlemmBuild::BuildThreads]
 			<< "link"
 			<< AllObjs << VCCoreDeps << " /nologo /SUBSYSTEM:CONSOLE "
 			<< Args
 			<< "/OUT:"
 			<< OutputPath
-			<< Build->TargetName
+			<< Build->Name
 			<< ".exe || goto :error" << std::endl;
 		OutputFile.append(".exe");
-		break;
-	case BuildInfo::BuildType::DynamicLibrary:
+	}
+	else if (Config == "sharedLibrary")
+	{
 		BuildScripts[KlemmBuild::BuildThreads]
 			<< "link"
 			<< " /nologo /DLL /MD "
 			<< Args
 			<< " /OUT:"
 			<< OutputPath
-			<< Build->TargetName
+			<< Build->Name
 			<< ".dll"
 			<< AllObjs
 			<< " || goto :error" << std::endl;
 		OutputFile.append(".dll");
-		break;
-	case BuildInfo::BuildType::StaticLibrary:
+	}
+	else if (Config == "staticLibrary")
+	{
 		BuildScripts[KlemmBuild::BuildThreads]
 			<< "lib"
 			<< Args
 			<< " /nologo /OUT:"
 			<< OutputPath
-			<< Build->TargetName
+			<< Build->Name
 			<< ".lib"
 			<< AllObjs
 			<< " || goto :error" << std::endl;
 		OutputFile.append(".lib");
-		break;
-	default:
-		break;
 	}
 
 	bool Relink = false;
@@ -430,7 +423,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 				Relink = true;
 			}
 		}
-		for (const auto& i : Build->Libraries)
+		for (const auto& i : Build->GetParameter("libraries")->GetValues())
 		{
 			if (!std::filesystem::exists(i + ".lib"))
 			{
@@ -457,7 +450,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 
 	if (!Relink)
 	{
-		std::cout << "Project '" << Build->TargetName << "' is up to date - skipping" << std::endl;
+		std::cout << "Project '" << Build->Name << "' is up to date - skipping" << std::endl;
 		return  true;
 	}
 
@@ -518,7 +511,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, BuildInfo* Build)
 		return false;
 	}
 
-	std::cout << "Project '" << Build->TargetName << "' -> " << OutputFile << std::endl;
+	std::cout << "Project '" << Build->Name << "' -> " << OutputFile << std::endl;
 
 	return true;
 }

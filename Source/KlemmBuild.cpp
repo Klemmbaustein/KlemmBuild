@@ -4,6 +4,7 @@
 #include <iostream>
 #include <filesystem>
 #include "FileUtility.h"
+#include "KlemmBuild.h"
 
 namespace KlemmBuild
 {
@@ -12,9 +13,9 @@ namespace KlemmBuild
 
 static std::vector<std::string> GlobalDefines;
 
-std::string BuildMakefile(std::string Makefile);
+std::string KlemmBuild::BuildMakefile(std::string Makefile);
 
-bool BuildProject(BuildInfo* Build, Makefile& Make)
+bool BuildMakefileTarget(Target* Build, Makefile& Make)
 {
 	BuildSystem* System = nullptr;
 	{
@@ -25,58 +26,32 @@ bool BuildProject(BuildInfo* Build, Makefile& Make)
 #endif
 	}
 
-	for (const auto& dep : Build->Dependencies)
+	for (const auto& dep : Build->GetParameter("dependencies")->GetValues())
 	{
 		bool Found = false;
-		for (BuildInfo* p : Make.Projects)
+		for (Target* p : Make.Targets)
 		{
-			if (p->TargetName == dep)
+			if (p->Name == dep)
 			{
-				std::cout << "Building dependency for project '" << Build->TargetName << "': '" << p->TargetName << "'" << std::endl;
-				BuildProject(p, Make);
+				std::cout << "Building dependency for target '" << Build->Name << "': '" << p->Name << "'" << std::endl;
+				BuildMakefileTarget(p, Make);
 				Found = true;
 				break;
 			}
 		}
 		if (!Found)
 		{
-			std::cout << "Could not find project '" << dep << "' referenced in '" << Build->TargetName << "'" << std::endl;
-			std::cout << "Build failed - exiting" << std::endl;
-
-			exit(1);
+			std::cout << "Could not find target '" << dep << "' referenced in '" << Build->Name << "'" << std::endl;
+			KlemmBuild::Exit();
 		}
 	}
+	Build->Invoke(System);
 
-	if (!Build->PreBuildCommand.empty())
-	{
-		System->ShellExecute(Build->PreBuildCommand);
-	}
-	if (!Build->BuildCommand.empty())
-	{
-		System->ShellExecute(Build->BuildCommand);
-		delete System;
-		return "";
-	}
-	if (Build->IsMakefile)
-	{
-		BuildMakefile(Build->MakefilePath);
-		delete System;
-		return "";
-	}
-
-	std::vector<std::string> ObjectFiles;
-
-	for (const auto& i : Build->CompiledFiles)
-	{
-		ObjectFiles.push_back(System->Compile(i, Build));
-	}
-
-	bool OutFile = System->Link(ObjectFiles, Build);
 	delete System;
-	return OutFile;
+	return true;
 }
 
-std::string BuildMakefile(std::string Makefile)
+std::string KlemmBuild::BuildMakefile(std::string Makefile)
 {
 	std::cout << " -- Building makefile " << Makefile << " -- " << std::endl;
 	auto MakefilePath = std::filesystem::absolute(Makefile);
@@ -84,31 +59,27 @@ std::string BuildMakefile(std::string Makefile)
 	std::filesystem::current_path(FileUtility::RemoveFilename(Makefile));
 
 	auto LoadedMakefile = Makefile::ReadMakefile(MakefilePath.string(), GlobalDefines);
-	if (LoadedMakefile.DefaultProject == SIZE_MAX)
+	if (LoadedMakefile.DefaultTarget == SIZE_MAX)
 	{
-		std::cout << "No default project specified - Building all" << std::endl;
-		for (BuildInfo* i : LoadedMakefile.Projects)
+		std::cout << "No default target specified - Building all" << std::endl;
+		for (Target* i : LoadedMakefile.Targets)
 		{
-			if (!BuildProject(i, LoadedMakefile))
+			if (!BuildMakefileTarget(i, LoadedMakefile))
 			{
-				std::cout << "Build failed - exiting" << std::endl;
-
-				exit(1);
+				KlemmBuild::Exit();
 			}
 		}
 	}
 	else
 	{
 		std::cout << "Starting with the default project - '" 
-			<< LoadedMakefile.Projects[LoadedMakefile.DefaultProject]->TargetName
+			<< LoadedMakefile.Targets[LoadedMakefile.DefaultTarget]->Name
 			<< "'" 
 			<< std::endl;
 
-		if (!BuildProject(LoadedMakefile.Projects[LoadedMakefile.DefaultProject], LoadedMakefile))
+		if (!BuildMakefileTarget(LoadedMakefile.Targets[LoadedMakefile.DefaultTarget], LoadedMakefile))
 		{
-			std::cout << "Build failed - exiting" << std::endl;
-
-			exit(1);
+			KlemmBuild::Exit();
 		}
 	}
 
@@ -122,6 +93,9 @@ int main(int argc, char** argv)
 	std::vector<std::string> Makefiles;
 	for (int i = 1; i < argc; i++)
 	{
+		/**
+		* @todo Implement a real argument parser
+		*/
 		std::string ArgStr = argv[i];
 		if (ArgStr.substr(0, 2) == "-D")
 		{
@@ -130,6 +104,30 @@ int main(int argc, char** argv)
 		else if (std::filesystem::exists(ArgStr))
 		{
 			Makefiles.push_back(ArgStr);
+		}
+		else if (ArgStr == "-h" || ArgStr == "--help")
+		{
+			std::cout << "Usage: " << argv[0] << " [Argument, Definition, Makefile]" << std::endl << std::endl;
+			std::cout << "Arguments:" << std::endl;
+			std::cout << "\t-h --help:    Displays this message" << std::endl;
+			std::cout << "\t-v --version: Shows version information" << std::endl << std::endl;
+			std::cout << "Definitions:" << std::endl;
+			std::cout << "\tAny argument starting with -D" << std::endl;
+			std::cout << "\tExample: The argument '-DDebug' defines the 'Debug' preprocessor definition for the given makefiles." << std::endl << std::endl;
+			std::cout << "Makefile:" << std::endl;
+			std::cout << "\tCan be the path to any file." << std::endl;
+			return 0;
+		}
+		else if (ArgStr == "-v" || ArgStr == "--version")
+		{
+			std::cout << "KlemmBuild C++ build system v" << KlemmBuild::Version << " for ";
+#if _WIN32
+			std::cout << "Windows" << std::endl;
+#else
+			std::cout << "Linux" << std::endl;
+#endif
+			std::cout << "GitHub: https://github.com/Klemmbaustein/KlemmBuild" << std::endl;
+			return 0;
 		}
 		else
 		{
@@ -149,6 +147,12 @@ int main(int argc, char** argv)
 	}
 	for (auto& i : Makefiles)
 	{
-		BuildMakefile(i);
+		KlemmBuild::BuildMakefile(i);
 	}
+}
+
+void KlemmBuild::Exit()
+{
+	std::cout << "Build failed - exiting" << std::endl;
+	exit(1);
 }

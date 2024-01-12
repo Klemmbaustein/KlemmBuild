@@ -13,14 +13,14 @@ public:
 	VCBuild(bool UsedForBuild = true);
 	~VCBuild();
 
-	virtual std::string Compile(std::string Source, BuildInfo* Build) override;
-	virtual bool Link(std::vector<std::string> Sources, BuildInfo* Build) override;
+	virtual std::string Compile(std::string Source, Target* Build) override;
+	virtual bool Link(std::vector<std::string> Sources, Target* Build) override;
 	virtual std::string PreprocessFile(std::string Source, std::vector<std::string> Definitions) override;
-	virtual bool RequiresRebuild(std::string File, BuildInfo* Info) override;
+	virtual bool RequiresRebuild(std::string File, Target* Info) override;
 	virtual int ShellExecute(std::string cmd) override;
 	static std::string GetVSLocation();
 protected:
-	static void CompileThread(int Index, BuildInfo* Info);
+	static void CompileThread(int Index, Target* Info);
 	int CompileIndex = 0;
 	std::string ClLocation;
 	std::vector<std::ofstream> BuildScripts;

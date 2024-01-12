@@ -22,7 +22,7 @@ A simple makefile looks like this:
 
 ```json
 {
-  "projects": {
+  "targets": {
     "name": "example",
     "outputPath": "bin/",
     "sources": [ "src/*.cpp" ]
@@ -35,7 +35,7 @@ The executable will be placed in the `bin/` directory.
 
 ```json
 {
-  "projects": {
+  "targets": {
 #if MSVC_WINDOWS
     "name": "example_windows",
 #else

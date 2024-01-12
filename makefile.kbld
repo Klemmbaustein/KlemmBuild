@@ -1,6 +1,6 @@
 {
-  "defaultProject": "klemmBld",
-  "projects": [
+  "defaultTarget": "klemmBld",
+  "targets": [
 	{
 	  "name": "klemmBld",
 	  "debug": true,
@@ -11,7 +11,7 @@
 	  "includes": [
 		"json/include"
 	  ],
-	  "optimization": "fast"
+	  "optimization": "fastest"
 	}
   ]
 }

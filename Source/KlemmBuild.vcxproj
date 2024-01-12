@@ -141,15 +141,22 @@
     <ClCompile Include="FileUtility.cpp" />
     <ClCompile Include="KlemmBuild.cpp" />
     <ClCompile Include="Makefile.cpp" />
+    <ClCompile Include="Targets\BuildTarget.cpp" />
+    <ClCompile Include="Targets\CommandTarget.cpp" />
+    <ClCompile Include="Targets\MakefileTarget.cpp" />
+    <ClCompile Include="Targets\Target.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Build.h" />
     <ClInclude Include="BuildSystem\BuildSystem.h" />
     <ClInclude Include="BuildSystem\GCC-Linux.h" />
     <ClInclude Include="BuildSystem\VCBuild.h" />
     <ClInclude Include="FileUtility.h" />
     <ClInclude Include="KlemmBuild.h" />
     <ClInclude Include="Makefile.h" />
+    <ClInclude Include="Targets\BuildTarget.h" />
+    <ClInclude Include="Targets\CommandTarget.h" />
+    <ClInclude Include="Targets\MakefileTarget.h" />
+    <ClInclude Include="Targets\Target.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
