@@ -33,15 +33,9 @@ static json Get(const json& from, std::string Field)
 
 static void VerifyPath(std::string Path, std::string Name, bool CreateIfMissing)
 {
-	if (!std::filesystem::exists(Path))
+	if (!std::filesystem::exists(Path) && CreateIfMissing)
 	{
-		if (CreateIfMissing)
-		{
-			std::filesystem::create_directories(Path);
-			return;
-		}
-		std::cout << "The given path for " << Name << " does not exist: '" << Path << "'" << std::endl;
-		KlemmBuild::Exit();
+		std::filesystem::create_directories(Path);
 	}
 }
 
