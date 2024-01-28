@@ -92,12 +92,6 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, Target* Build)
 	}
 
 	CompileAll(Build);
-	std::string SourcesString;
-
-	for (auto& i : Sources)
-	{
-		SourcesString.append(" " + i + " ");
-	}
 	std::string OutputFile = OutputPath;
 
 	std::string Config = Build->GetParameter("configuration")->Value;
@@ -161,11 +155,11 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, Target* Build)
 	std::string Command;
 
 	if (Config == "sharedLibrary")
-		Command = ("c++ -shared" + SourcesString + LibStrings + " -o " + OutputFile);
+		Command = GetLinkCommand(Build, "c++", " -shared " + LibStrings + " -o " + OutputFile, Sources);
 	else if (Config == "executable")
-		Command = ("c++ " + SourcesString + LibStrings + " -Wl,-rpath,'$ORIGIN' -o " + OutputFile);
+		Command = GetLinkCommand(Build, "c++ ", LibStrings + " -Wl,-rpath,'$ORIGIN' -o " + OutputFile, Sources);
 	else if (Config == "staticLibrary")
-		Command = ("ar rcs " + OutputFile + SourcesString);
+		Command = GetLinkCommand(Build, "ar rcs " + OutputFile, "", Sources);
 
 	for (auto& Path : Sources)
 	{
@@ -296,7 +290,6 @@ void GCC_Linux::CompileAll(Target* Build)
 	BuildThreads.clear();
 }
 
-static std::mutex PrintMutex;
 
 void GCC_Linux::BuildThread(std::vector<std::string> Files, Target* Build)
 {
@@ -328,15 +321,34 @@ void GCC_Linux::BuildThread(std::vector<std::string> Files, Target* Build)
 		Flags.append(" -D " + i + " ");
 	}
 
+	std::string CppStandard = Build->GetParameter("languageVersion")->Value;
+
+	if (CppStandard == "latest")
+	{
+		CppStandard = "c++23";
+	}
+
+	bool WithoutU8Char = Build->GetParameter("u8char")->Value == "0";
+	if (WithoutU8Char && std::stoi(CppStandard.substr(CppStandard.size() - 2)) >= 20)
+	{
+		Flags.append(" -fno-char8_t ");
+	}
+	if (CppStandard == "c++20")
+	{
+		CppStandard = "c++2a";
+	}
+
+	Flags.append(" -std=" + CppStandard);
+
 	for (auto& i : Files)
 	{
 		std::filesystem::create_directories("Build/" + Build->Name + "/" + FileUtility::RemoveFilename(i));
 		std::string ObjectFile = "Build/" + Build->Name + "/" + i + ".o";
-		PrintMutex.lock();
+		KlemmBuild::PrintMutex.lock();
 		std::cout << "- [" << (size_t)(((float)BuiltFiles / (float)AllFiles) * 100.0f) << "%] Compiling " + i << std::endl;
-		PrintMutex.unlock();
+		KlemmBuild::PrintMutex.unlock();
 		BuiltFiles++;
-		std::string Command = "c++ -c -MMD -MP " + Flags + i + IncludeString + " -fno-char8_t -fPIC -std=c++2a -o " + ObjectFile;
+		std::string Command = GetCompileCommand(Build, "c++", " -frtti -MMD -MP " + Flags + IncludeString + " -fPIC -o " + ObjectFile + " -c ", i);
 		int ret = system(Command.c_str());
 		if (BuildFailed)
 		{

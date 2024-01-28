@@ -16,14 +16,23 @@
 			]
 
 		},
+
 		{
 			"name": "TestLib",
 			"sources": [
 				"LibSource/*.cpp"
 			],
 			"outputPath": "lib/",
-			"configuration": "sharedLibrary"
+			"defines": [
+				"EXPORT_SHARED"
+			],
+			"configuration": "sharedLibrary",
+
+			"compileCommand": "{compiler} {args} {file}",
+
+			"languageVersion": "c++14"
 		},
+
 		{
 		    "type": "command",
 			"name": "print",

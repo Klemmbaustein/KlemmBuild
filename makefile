@@ -9,7 +9,7 @@ DEPS := $(OBJS:.o=.d)
 INC_DIRS := $(SRC_DIRS) json/include
 INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
-CPPFLAGS := $(INC_FLAGS) -MMD -MP -fno-char8_t -std=c++2a
+CPPFLAGS := $(INC_FLAGS) -MMD -MP -fno-char8_t -std=c++20
 
 $(TARGET_EXEC): $(OBJS)
 	$(CXX) $(OBJS) -o $@
@@ -25,7 +25,7 @@ clean:
 	rm -r $(BUILD_DIR)
 
 install: $(TARGET_EXEC)
-	$(info Installing to $(PREFIX))
+	$(info Installing to $(DESTDIR)$(PREFIX)/bin/)
 	install -d $(DESTDIR)$(PREFIX)/bin/
 	install -m 644 ./KlemmBuild $(DESTDIR)$(PREFIX)/bin/
 	chmod +x $(DESTDIR)$(PREFIX)/bin/KlemmBuild

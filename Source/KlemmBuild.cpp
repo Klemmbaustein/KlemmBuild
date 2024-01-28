@@ -8,6 +8,7 @@
 
 namespace KlemmBuild
 {
+	std::mutex PrintMutex;
 	uint8_t BuildThreads = 4;
 }
 

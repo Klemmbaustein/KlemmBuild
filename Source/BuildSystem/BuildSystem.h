@@ -17,4 +17,7 @@ public:
 	virtual bool RequiresRebuild(std::string File, Target* Info) = 0;
 
 	virtual int ShellExecute(std::string cmd) { return system(cmd.c_str()); };
+
+	static std::string GetCompileCommand(Target* Build, std::string Compiler, std::string Args, std::string File);
+	static std::string GetLinkCommand(Target* Build, std::string Linker, std::string Args, std::vector<std::string> Files);
 };

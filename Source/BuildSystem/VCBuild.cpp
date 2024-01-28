@@ -4,6 +4,7 @@
 #include <iostream>
 #include "../FileUtility.h"
 #include "../KlemmBuild.h"
+#include "../Format.h"
 #include <thread>
 
 std::vector<int> VCBuild::BuildOutput;
@@ -103,7 +104,9 @@ void VCBuild::CompileThread(int Index, Target* Info)
 				CurrentCompiledFile.Path = CurrentLine.substr(15);
 				CurrentCompiledFile.ObjPath = "Build/" + Info->Name + "/" + CurrentLine.substr(15) + ".obj";
 				CurrentCompiledFile.ObjDeps.clear();
+				KlemmBuild::PrintMutex.lock();
 				std::cout << "- [" << (size_t)(((float)BuiltFiles / (float)AllFiles) * 100.0f) << "%] Compiling " + CurrentLine.substr(15) << std::endl;
+				KlemmBuild::PrintMutex.unlock();
 				BuiltFiles++;
 			}
 			else if (CurrentLine.find("error") != std::string::npos)
@@ -113,6 +116,11 @@ void VCBuild::CompileThread(int Index, Target* Info)
 			else if (CurrentLine == "BUILD: DONE")
 			{
 				break;
+			}
+			// cl.exe prints the file name of the compiled file. Ignore that.
+			else if (FileUtility::GetExtension(CurrentLine) != "cpp")
+			{
+				std::cout << CurrentLine << std::endl;
 			}
 			CurrentLine.clear();
 			continue;
@@ -256,36 +264,53 @@ std::string VCBuild::Compile(std::string Source, Target* Build)
 			Args.append(" /DEBUG /Zi /Fd:" + Build->GetParameter("outputPath")->Value + "/" + Build->Name + ".pdb ");
 		}
 
-		std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Build->Name + "/" + Source));
-		BuildScripts[CompileThreadIndex] << "cl /nologo /FS /showIncludes /D KLEMMBUILD /MD /c /permissive- /Zc:preprocessor /std:c++20 /EHsc /Zc:char8_t- "
-			+ Args
+		std::string LanguageVersion = Build->GetParameter("languageVersion")->Value;
+		bool WithoutU8Char = Build->GetParameter("u8char")->Value == "0";
+
+		if (LanguageVersion == "latest")
+		{
+			LanguageVersion = "c++latest";
+			if (WithoutU8Char)
+			{
+				Args.append(" /Zc:char8_t- ");
+			}
+		}
+		else if (WithoutU8Char && std::stoi(LanguageVersion.substr(LanguageVersion.size() - 2)) >= 20)
+		{
+			Args.append(" /Zc:char8_t- ");
+		}
+		LanguageVersion = " /std:" + LanguageVersion;
+
+
+		std::string Command = GetCompileCommand(Build, "cl.exe", Args
 			+ " "
+			+ LanguageVersion
 			+ PreprocessorString
-			+ Source
 			+ Includes
+			+ " /FS /nologo /showIncludes /D KLEMMBUILD /MD /c /permissive- /Zc:preprocessor /EHsc "
 			+ " /Fo:\"Build/"
-			+ Build->Name 
+			+ Build->Name
 			+ "/"
 			+ Source
-			+ ".obj\"" << " || goto :error" << std::endl;
+			+ ".obj\"",
+			Source);
+		std::filesystem::create_directories(FileUtility::RemoveFilename("Build/" + Build->Name + "/" + Source));
+		BuildScripts[CompileThreadIndex]
+			<< Command
+			<< " || goto :error" << std::endl;
 		AllFiles++;
 	}
 	return "Build/" + Build->Name + "/" + Source + ".obj";
 }
 bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 {
-	std::cout << "Building project '" << Build->Name << "' with build system MSVC" << std::endl;
-
-	std::string AllObjs;
-	for (const auto& i : Sources)
-	{
-		AllObjs.append(" " + i + " ");
-	}
 	std::string OutPath = Build->GetParameter("outputPath")->Value;
+
+	std::string Libs;
 
 	for (const auto& i : Build->GetParameter("libraries")->GetValues())
 	{
-		AllObjs.append(" " + i + ".lib ");
+		Libs.append(" " + i + ".lib ");
 		if (std::filesystem::exists(i + ".dll") && !std::filesystem::is_directory(i + ".dll"))
 		{
 			std::filesystem::copy(i + ".dll",
@@ -366,46 +391,52 @@ bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 		Args.append(" /DEBUG /Zi /FS /Fd:" + OutPath + "/" + Build->Name + ".pdb ");
 	}
 
-	std::string Config = Build->GetParameter("configuration")->Name;
+	std::string Config = Build->GetParameter("configuration")->Value;
 
 	if (Config == "executable")
 	{
 		BuildScripts[KlemmBuild::BuildThreads]
-			<< "link"
-			<< AllObjs << VCCoreDeps << " /nologo /SUBSYSTEM:CONSOLE "
-			<< Args
-			<< "/OUT:"
-			<< OutputPath
-			<< Build->Name
-			<< ".exe || goto :error" << std::endl;
+			<< GetLinkCommand(Build, "link.exe", VCCoreDeps
+				+ " /nologo /out:"
+				+ OutputPath
+				+ Build->Name
+				+ ".exe "
+				+ Libs
+				+ VCCoreDeps
+				+ Args, Sources)
+			<< " || goto :error" << std::endl;
 		OutputFile.append(".exe");
 	}
 	else if (Config == "sharedLibrary")
 	{
 		BuildScripts[KlemmBuild::BuildThreads]
-			<< "link"
-			<< " /nologo /DLL /MD "
-			<< Args
-			<< " /OUT:"
-			<< OutputPath
-			<< Build->Name
-			<< ".dll"
-			<< AllObjs
+			<< GetLinkCommand(Build, "link.exe",
+				" /nologo /dll /md "
+				+ Args
+				+ Libs
+				+ " /out:"
+				+ OutputPath
+				+ Build->Name
+				+ ".dll",
+				Sources)
 			<< " || goto :error" << std::endl;
 		OutputFile.append(".dll");
 	}
 	else if (Config == "staticLibrary")
 	{
 		BuildScripts[KlemmBuild::BuildThreads]
-			<< "lib"
-			<< Args
-			<< " /nologo /OUT:"
-			<< OutputPath
-			<< Build->Name
-			<< ".lib"
-			<< AllObjs
+			<< GetLinkCommand(Build, "lib.exe",
+				" /nologo /out:"
+				+ OutputPath
+				+ Build->Name
+				+ ".lib",
+				Sources)
 			<< " || goto :error" << std::endl;
 		OutputFile.append(".lib");
+	}
+	else
+	{
+		KlemmBuild::Exit();
 	}
 
 	bool Relink = false;
@@ -492,6 +523,10 @@ bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 			{
 				std::cout << "- [100%] Linking..." << std::endl;
 			}
+			else
+			{
+				std::cout << CurrentLine << std::endl;
+			}
 			CurrentLine.clear();
 			continue;
 		}
@@ -542,7 +577,6 @@ std::string VCBuild::PreprocessFile(std::string Source, std::vector<std::string>
 			break;
 		}
 	}
-
 
 	int ret = _pclose(Preprocessor);
 	

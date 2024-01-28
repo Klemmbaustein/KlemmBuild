@@ -136,9 +136,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BuildSystem\BuildSystem.cpp" />
     <ClCompile Include="BuildSystem\GCC-Linux.cpp" />
     <ClCompile Include="BuildSystem\VCBuild.cpp" />
     <ClCompile Include="FileUtility.cpp" />
+    <ClCompile Include="Format.cpp" />
     <ClCompile Include="KlemmBuild.cpp" />
     <ClCompile Include="Makefile.cpp" />
     <ClCompile Include="Targets\BuildTarget.cpp" />
@@ -151,6 +153,7 @@
     <ClInclude Include="BuildSystem\GCC-Linux.h" />
     <ClInclude Include="BuildSystem\VCBuild.h" />
     <ClInclude Include="FileUtility.h" />
+    <ClInclude Include="Format.h" />
     <ClInclude Include="KlemmBuild.h" />
     <ClInclude Include="Makefile.h" />
     <ClInclude Include="Targets\BuildTarget.h" />
