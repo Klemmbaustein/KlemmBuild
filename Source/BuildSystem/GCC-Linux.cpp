@@ -200,11 +200,11 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, Target* Build)
 			return false;
 		}
 
-		std::cout << "Project '" << Build->Name << "' -> " << OutputFile << std::endl;
+		std::cout << "Target '" << Build->Name << "' -> " << OutputFile << std::endl;
 	}
 	else
 	{
-		std::cout << "Project '" << Build->Name << "' is up to date - skipping" << std::endl;
+		std::cout << "Target '" << Build->Name << "' is up to date - skipping" << std::endl;
 	}
 	return true;
 }

@@ -313,9 +313,16 @@ bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 		Libs.append(" " + i + ".lib ");
 		if (std::filesystem::exists(i + ".dll") && !std::filesystem::is_directory(i + ".dll"))
 		{
-			std::filesystem::copy(i + ".dll",
-				OutPath + "/" + FileUtility::GetFilenameFromPath(i) + ".dll",
-				std::filesystem::copy_options::overwrite_existing);
+			std::string ToLib = OutPath + "/" + FileUtility::GetFilenameFromPath(i) + ".dll";
+			try
+			{
+				std::filesystem::copy(i + ".dll",
+					ToLib,
+					std::filesystem::copy_options::overwrite_existing);
+			}
+			catch (std::exception)
+			{
+			}
 		}
 	}
 
@@ -411,7 +418,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 	{
 		BuildScripts[KlemmBuild::BuildThreads]
 			<< GetLinkCommand(Build, "link.exe",
-				" /nologo /dll /md "
+				" /nologo /dll "
 				+ Args
 				+ Libs
 				+ " /out:"
@@ -474,14 +481,13 @@ bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: DONE" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << "exit" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << ":error" << std::endl;
-	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: FAILED WITH ERROS" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << "echo BUILD: DONE" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads] << "exit 1" << std::endl;
 	BuildScripts[KlemmBuild::BuildThreads].close();
 
 	if (!Relink)
 	{
-		std::cout << "Project '" << Build->Name << "' is up to date - skipping" << std::endl;
+		std::cout << "Target '" << Build->Name << "' is up to date - skipping" << std::endl;
 		return  true;
 	}
 
@@ -546,7 +552,7 @@ bool VCBuild::Link(std::vector<std::string> Sources, Target* Build)
 		return false;
 	}
 
-	std::cout << "Project '" << Build->Name << "' -> " << OutputFile << std::endl;
+	std::cout << "Target '" << Build->Name << "' -> " << OutputFile << std::endl;
 
 	return true;
 }
