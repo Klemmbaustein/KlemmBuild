@@ -13,6 +13,7 @@ namespace KlemmBuild
 }
 
 static std::vector<std::string> GlobalDefines;
+static std::string TargetOverride;
 
 std::string KlemmBuild::BuildMakefile(std::string Makefile);
 
@@ -60,7 +61,31 @@ std::string KlemmBuild::BuildMakefile(std::string Makefile)
 	std::filesystem::current_path(FileUtility::RemoveFilename(Makefile));
 
 	auto LoadedMakefile = Makefile::ReadMakefile(MakefilePath.string(), GlobalDefines);
-	if (LoadedMakefile.DefaultTarget == SIZE_MAX)
+	if (!TargetOverride.empty())
+	{
+		std::string TargetName = TargetOverride;
+		TargetOverride.clear();
+		std::cout << "Target specified from command line - '" << TargetName << "'" << std::endl;
+		bool Found = false;
+		for (Target* i : LoadedMakefile.Targets)
+		{
+			if (i->Name == TargetName)
+			{
+				if (!BuildMakefileTarget(i, LoadedMakefile))
+				{
+					KlemmBuild::Exit();
+				}
+				Found = true;
+				break;
+			}
+		}
+		if (!Found)
+		{
+			std::cout << "Could not find target: '" << TargetName << "'" << std::endl;
+			KlemmBuild::Exit();
+		}
+	}
+	else if (LoadedMakefile.DefaultTarget == SIZE_MAX)
 	{
 		std::cout << "No default target specified - Building all" << std::endl;
 		for (Target* i : LoadedMakefile.Targets)
@@ -73,7 +98,7 @@ std::string KlemmBuild::BuildMakefile(std::string Makefile)
 	}
 	else
 	{
-		std::cout << "Starting with the default project - '" 
+		std::cout << "Starting with the default target - '" 
 			<< LoadedMakefile.Targets[LoadedMakefile.DefaultTarget]->Name
 			<< "'" 
 			<< std::endl;
@@ -101,6 +126,10 @@ int main(int argc, char** argv)
 		if (ArgStr.substr(0, 2) == "-D")
 		{
 			GlobalDefines.push_back(ArgStr.substr(2));
+		}
+		else if (ArgStr.substr(0, 2) == "-T")
+		{
+			TargetOverride = ArgStr.substr(2);
 		}
 		else if (std::filesystem::exists(ArgStr))
 		{
