@@ -371,3 +371,4 @@ Build/
 ./Test/lib
 *.so
 KlemmBuild
+.vscode/*

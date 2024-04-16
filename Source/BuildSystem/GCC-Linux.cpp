@@ -17,6 +17,20 @@ std::atomic<size_t> GCC_Linux::AllFiles;
 #define pclose(...) _pclose(__VA_ARGS__)
 #endif
 
+std::string SystemCommand(std::string Command)
+{
+	FILE* f = popen(Command.c_str(), "r");
+	std::string Out;
+	char buffer[2048];
+	while (fgets(buffer, sizeof(buffer), f) != NULL)
+	{
+		Out.append(buffer);
+	}
+	
+	pclose(f);
+	return Out;
+}
+
 std::atomic<bool> BuildFailed = false;
 
 std::string GCC_Linux::Compile(std::string Source, Target* Build)
@@ -126,22 +140,31 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, Target* Build)
 			i = ":" + i;
 		}
 
-		LibStrings.append(" -L"
-			+ std::filesystem::absolute(FileUtility::RemoveFilename(i)).string() 
-			+ " -l" + FileUtility::GetFilenameFromPath(i));
-
 		std::string SoName = FileUtility::RemoveFilename(i) + "/lib" + FileUtility::GetFilenameFromPath(i) + ".so";
 		std::string ArchiveName = FileUtility::RemoveFilename(i) + "/lib" + FileUtility::GetFilenameFromPath(i) + ".a";
 
+		bool Found = false;
+
 		if (std::filesystem::exists(SoName) && !std::filesystem::is_directory(SoName))
 		{
+			std::string FileSoName = SystemCommand("readelf -d \"" + SoName + "\" | grep SONAME");
+
+			FileSoName = FileSoName.substr(FileSoName.find_first_of("[") + 1);
+			FileSoName = FileSoName.substr(0, FileSoName.find_first_of("]"));
+
 			std::filesystem::copy(SoName,
-				OutputPath + "lib" + FileUtility::GetFilenameFromPath(i) + ".so",
+				OutputPath + "/" + FileSoName,
 				std::filesystem::copy_options::overwrite_existing);
 			if (std::filesystem::last_write_time(SoName) > ExecWriteTime)
 			{
 				RequiresReLink = true;
 			}
+
+			
+
+			Found = true;
+		
+			LibStrings.append(" -l:\"" + SoName + "\"");
 		}
 
 		if (std::filesystem::exists(ArchiveName) && !std::filesystem::is_directory(ArchiveName))
@@ -150,6 +173,17 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, Target* Build)
 			{
 				RequiresReLink = true;
 			}
+
+			Found = true;
+
+			LibStrings.append(" -l:\"" + ArchiveName + "\"");
+		}
+
+		if (!Found)
+		{
+			LibStrings.append(" -L"
+				+ std::filesystem::absolute(FileUtility::RemoveFilename(i)).string() 
+				+ " -l" + FileUtility::GetFilenameFromPath(i));
 		}
 	}
 	std::string Command;

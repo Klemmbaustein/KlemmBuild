@@ -3,7 +3,7 @@
 
 namespace KlemmBuild
 {
-	constexpr const char* Version = "0.1.1";
+	constexpr const char* Version = "0.1.2";
 
 	extern uint8_t BuildThreads;
 	void Exit();
