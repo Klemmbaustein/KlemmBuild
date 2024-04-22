@@ -164,7 +164,7 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, Target* Build)
 
 			Found = true;
 		
-			LibStrings.append(" -l:\"" + SoName + "\"");
+			LibStrings.append(" -l:\"" + SoName + "\" ");
 		}
 
 		if (std::filesystem::exists(ArchiveName) && !std::filesystem::is_directory(ArchiveName))
@@ -176,11 +176,16 @@ bool GCC_Linux::Link(std::vector<std::string> Sources, Target* Build)
 
 			Found = true;
 
-			LibStrings.append(" -l:\"" + ArchiveName + "\"");
+			LibStrings.append(" \"" + std::filesystem::canonical(ArchiveName).string() + "\" ");
 		}
 
 		if (!Found)
 		{
+			if (FileUtility::GetFilenameFromPath(i).empty())
+			{
+				std::cout << "Missing library name: " << i << std::endl;
+				continue;
+			}
 			LibStrings.append(" -L"
 				+ std::filesystem::absolute(FileUtility::RemoveFilename(i)).string() 
 				+ " -l" + FileUtility::GetFilenameFromPath(i));
